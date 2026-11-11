@@ -1,0 +1,11 @@
+node_modules
+.next
+.pgdata
+storage
+.env
+.env.*
+!.env.example
+generators/tarot/out
+.claude
+.git
+*.log

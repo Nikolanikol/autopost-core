@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+dist/
+.pgdata/
+storage/
+generators/tarot/out/
+.claude/
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store

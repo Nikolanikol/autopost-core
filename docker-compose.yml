@@ -1,0 +1,57 @@
+# Деплой через Coolify (Docker Compose) или вручную: docker compose up -d --build
+# Домен назначается сервису web (порт 3000) в Coolify — HTTPS делает его Traefik.
+# Переменные задаются в Coolify → Environment Variables (или в .env рядом с файлом).
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://autopost:${POSTGRES_PASSWORD}@db:5432/autopost
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      GRAPH_VERSION: ${GRAPH_VERSION:-v24.0}
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["node_modules/.bin/tsx", "src/worker/index.ts"]
+    environment:
+      DATABASE_URL: postgres://autopost:${POSTGRES_PASSWORD}@db:5432/autopost
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      GRAPH_VERSION: ${GRAPH_VERSION:-v24.0}
+    depends_on:
+      web:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: autopost
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: autopost
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autopost -d autopost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  storage:
+  pgdata:
