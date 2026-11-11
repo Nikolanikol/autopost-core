@@ -16,9 +16,10 @@ export function AddAccountForm() {
         <option value="instagram">Instagram</option>
       </select>
       <label htmlFor="external_id">ID аккаунта Instagram</label>
-      <input id="external_id" name="external_id" type="text" required placeholder="1784…" inputMode="numeric" />
+      <input id="external_id" name="external_id" type="text" required placeholder="1784…" inputMode="numeric" autoComplete="off" />
       <label htmlFor="token">Токен доступа</label>
-      <input id="token" name="token" type="password" required autoComplete="off" />
+      {/* new-password: не даём браузеру подставлять сохранённый пароль от интерфейса */}
+      <input id="token" name="token" type="password" required autoComplete="new-password" />
       {state?.error && (
         <div className="alert bad">
           {state.error}

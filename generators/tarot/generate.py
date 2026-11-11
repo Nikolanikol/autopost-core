@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Генератор постов по картам таро DK Matrix.
 
-Берёт page.json и арт карты из cards-pack/standard, рендерит картинку 1080×1350 (4:5, JPEG)
-и собирает подпись с хэштегами. Результат: out/<slug>.jpg и out/posts.json —
-их отправляет в ядро скрипт push.ts через API.
+Источники карт (по порядку приоритета, первая найденная версия карты побеждает):
+  1. cards-pack/standard/DKMatrix_*/page.json + images/hero-landscape.webp
+  2. lunar-oracle: modules/tarot/arcana/content/*.json + public/knowledge/tarot/<slug>/hero-landscape.webp
 
-Запуск: python3 generators/tarot/generate.py [путь к cards-pack/standard]
+Рендерит картинку 1080×1350 (4:5, JPEG) и собирает подпись с хэштегами.
+Результат: out/<slug>.jpg и out/posts.json — их отправляет в ядро push.ts через API.
+
+Запуск: python3 generators/tarot/generate.py [cards-pack/standard] [lunar-oracle]
 """
 import json
 import sys
@@ -14,7 +17,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-SRC = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Desktop/cards-pack/standard")
+CARDS_PACK = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Desktop/cards-pack/standard")
+LUNAR = Path(sys.argv[2] if len(sys.argv) > 2 else Path.home() / "Desktop/lunar-oracle")
 OUT = Path(__file__).parent / "out"
 FONTS = Path("/System/Library/Fonts/Supplemental")
 
@@ -29,6 +33,14 @@ CARDS = {
     "00_the_fool": ("0", "Шут"),
     "01_the_magician": ("I", "Маг"),
     "02_the_high_priestess": ("II", "Верховная Жрица"),
+    "03_the_empress": ("III", "Императрица"),
+    "04_the_emperor": ("IV", "Император"),
+    "05_the_hierophant": ("V", "Иерофант"),
+    "06_the_lovers": ("VI", "Влюблённые"),
+    "07_the_chariot": ("VII", "Колесница"),
+    "08_strength": ("VIII", "Сила"),
+    "09_the_hermit": ("IX", "Отшельник"),
+    "10_wheel_of_fortune": ("X", "Колесо Фортуны"),
 }
 
 BASE_TAGS = ["таро", "старшиеарканы", "арканы", "значениекарт", "картадня", "dkmatrix"]
@@ -48,8 +60,8 @@ def centered(draw: ImageDraw.ImageDraw, y: int, text: str, f, fill, width_chars:
     return y - spacing
 
 
-def render(card_dir: Path, page: dict, num: str, name: str, out: Path):
-    art = Image.open(card_dir / "images/hero-landscape.webp").convert("RGB")
+def render(art_path: Path, page: dict, num: str, name: str, out: Path):
+    art = Image.open(art_path).convert("RGB")
     # Арт крупнее: по высоте ART_H, по ширине обрезка по центру.
     art_h = 780
     scaled_w = round(art.width * art_h / art.height)
@@ -118,16 +130,28 @@ def caption(page: dict, num: str, name: str) -> str:
     return text
 
 
+def iter_cards():
+    """(page, art_path) из всех источников; cards-pack важнее lunar-oracle."""
+    for d in sorted(CARDS_PACK.glob("DKMatrix_*")):
+        if (d / "page.json").exists() and (d / "images/hero-landscape.webp").exists():
+            yield json.loads((d / "page.json").read_text()), d / "images/hero-landscape.webp"
+    for f in sorted((LUNAR / "modules/tarot/arcana/content").glob("*.json")):
+        page = json.loads(f.read_text())
+        art = LUNAR / "public/knowledge/tarot" / page["slug"] / "hero-landscape.webp"
+        if art.exists():
+            yield page, art
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    posts = []
-    for card_dir in sorted(SRC.glob("DKMatrix_*")):
-        page = json.loads((card_dir / "page.json").read_text())
-        if page["cardId"] not in CARDS:
+    posts, seen = [], set()
+    for page, art in iter_cards():
+        if page["cardId"] not in CARDS or page["cardId"] in seen:
             continue
+        seen.add(page["cardId"])
         num, name = CARDS[page["cardId"]]
         out = OUT / f"{page['slug']}.jpg"
-        render(card_dir, page, num, name, out)
+        render(art, page, num, name, out)
         posts.append(
             {
                 "slug": page["slug"],
@@ -137,9 +161,10 @@ def main():
                 "source_status": page.get("status"),
             }
         )
-        print(f"✓ {name}: {out.name}")
+        print(f"✓ {num:>4} {name}: {out.name}")
+    posts.sort(key=lambda p: p["card_id"])
     (OUT / "posts.json").write_text(json.dumps(posts, ensure_ascii=False, indent=2))
-    print(f"Готово: {len(posts)} поста → {OUT / 'posts.json'}")
+    print(f"Готово: {len(posts)} постов → {OUT / 'posts.json'}")
 
 
 if __name__ == "__main__":
