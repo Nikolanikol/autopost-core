@@ -1,7 +1,7 @@
 // Отправляет сгенерированные посты таро в ядро через API (как это будет делать любой генератор).
 //
 //   AUTOPOST_URL=https://post.example.com AUTOPOST_KEY=ak_… AUTOPOST_ACCOUNT=<id> \
-//     node generators/tarot/push.ts [next_slot | 2026-11-13T18:00:00+03:00 …]
+//     pnpm tsx generators/tarot/push.ts [next_slot | 2026-11-13T18:00:00+03:00 …]
 //
 // Без аргументов — каждый пост в ближайший свободный слот аккаунта.
 // С датами — по порядку: первый пост на первую дату и т. д.

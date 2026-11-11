@@ -44,7 +44,7 @@ worker стартует после того, как веб стал healthy.
    ```bash
    python3 generators/tarot/generate.py
    AUTOPOST_URL=https://post.dkmatrix.com AUTOPOST_KEY=ak_… AUTOPOST_ACCOUNT=<id> \
-     node generators/tarot/push.ts
+     pnpm tsx generators/tarot/push.ts
    ```
 
 ## Бэкапы
