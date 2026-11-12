@@ -43,6 +43,29 @@ export interface Publisher {
   classifyError(e: unknown): ErrorClass;
   verifyAccount(externalId: string, token: string): Promise<{ username: string }>;
   quota?(externalId: string, token: string): Promise<{ used: number; total: number } | null>;
+  /** Метрики опубликованного поста. Ошибки прав не должны ронять аккаунт — только помечаются в notes. */
+  postMetrics?(mediaId: string, token: string): Promise<PostMetrics>;
+  accountMetrics?(externalId: string, token: string): Promise<AccountMetrics>;
+}
+
+export interface PostMetrics {
+  likes?: number | null;
+  comments?: number | null;
+  saves?: number | null;
+  shares?: number | null;
+  reach?: number | null;
+  views?: number | null;
+  raw: Record<string, unknown>;
+  notes: string[];
+}
+
+export interface AccountMetrics {
+  followers?: number | null;
+  media_count?: number | null;
+  reach_day?: number | null;
+  views_day?: number | null;
+  raw: Record<string, unknown>;
+  notes: string[];
 }
 
 export class PlatformError extends Error {

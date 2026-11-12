@@ -1,10 +1,11 @@
 import { one, q } from "./db";
-import { wallTime, zonedToUtc } from "./tz";
+import { normalizeTz, wallTime, zonedToUtc } from "./tz";
 
 export const WEEKDAYS = ["", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 export async function workspaceTz(workspaceId: string): Promise<string> {
-  return (await one<{ timezone: string }>("select timezone from workspaces where id=$1", [workspaceId]))?.timezone ?? "Europe/Moscow";
+  const raw = (await one<{ timezone: string }>("select timezone from workspaces where id=$1", [workspaceId]))?.timezone;
+  return (raw && normalizeTz(raw)) || "Europe/Moscow";
 }
 
 export function listSlots(accountId: string) {

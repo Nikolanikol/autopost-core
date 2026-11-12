@@ -54,3 +54,24 @@ export function dayKey(date: Date, tz: string) {
   const w = wallTime(date, tz);
   return `${w.year}-${String(w.month).padStart(2, "0")}-${String(w.day).padStart(2, "0")}`;
 }
+
+/** Каноническое имя пояса (asia/seoul → Asia/Seoul) или null, если пояс неизвестен. */
+export function normalizeTz(tz: string): string | null {
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: tz.trim() }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
+}
+
+/** Короткая подпись пояса для интерфейса: «Сеул, UTC+9». */
+export function tzLabel(tz: string): string {
+  const city = tz.split("/").pop()!.replace(/_/g, " ");
+  const off = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "shortOffset" })
+    .formatToParts(new Date())
+    .find((p) => p.type === "timeZoneName")?.value.replace("GMT", "UTC");
+  return `${city}${off ? `, ${off === "UTC" ? "UTC+0" : off}` : ""}`;
+}
+
+export const fmtIn = (d: Date | string | null, tz: string, opts: Intl.DateTimeFormatOptions = { dateStyle: "short", timeStyle: "short" }) =>
+  d ? new Date(d).toLocaleString("ru-RU", { ...opts, timeZone: tz }) : "—";

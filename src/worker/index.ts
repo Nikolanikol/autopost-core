@@ -5,6 +5,7 @@ import { one, pool, q } from "@/lib/db";
 import { getBoss, enqueueTarget, PUBLISH_QUEUE, type PublishJob } from "@/lib/queue";
 import { refreshPostStatus } from "@/lib/posts";
 import { emit } from "@/lib/notify";
+import { collectMetrics } from "@/lib/metrics";
 import { publisherFor, PlatformError, type MediaItem, type PublishContext } from "@/publishers";
 
 const POLL_INTERVAL_S = 10;
@@ -144,8 +145,26 @@ await boss.work<PublishJob>(PUBLISH_QUEUE, { batchSize: 1, pollingIntervalSecond
 });
 console.log("worker запущен, очередь:", PUBLISH_QUEUE);
 
+// Сбор статистики: через минуту после старта, затем каждые METRICS_INTERVAL_MIN (по умолчанию 3 часа).
+const METRICS_INTERVAL_MIN = Number(process.env.METRICS_INTERVAL_MIN) || 180;
+let metricsRunning = false;
+const runMetrics = async () => {
+  if (metricsRunning) return;
+  metricsRunning = true;
+  try {
+    await collectMetrics();
+  } catch (e) {
+    console.error("📊 сбор метрик упал:", (e as Error).message);
+  } finally {
+    metricsRunning = false;
+  }
+};
+setTimeout(runMetrics, 60_000);
+const metricsTimer = setInterval(runMetrics, METRICS_INTERVAL_MIN * 60_000);
+
 const shutdown = async () => {
   console.log("останавливаюсь…");
+  clearInterval(metricsTimer);
   await boss.stop({ graceful: true, timeout: 30_000 });
   await pool.end();
   process.exit(0);

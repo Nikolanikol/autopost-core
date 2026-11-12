@@ -35,7 +35,7 @@ export function WorkspaceForm({ timezone }: { timezone: string }) {
         <input id="tz" name="timezone" type="text" defaultValue={timezone} style={{ flex: 1, minWidth: 200 }} />
         <button disabled={pending}>Сохранить</button>
       </div>
-      <div className="muted small">Например Europe/Moscow, Europe/Berlin, Asia/Dubai. Влияет на слоты и календарь.</div>
+      <div className="muted small">Например Asia/Seoul, Europe/Moscow, Europe/Berlin. Влияет на слоты, календарь и время в очереди.</div>
       <Result state={state} />
     </form>
   );

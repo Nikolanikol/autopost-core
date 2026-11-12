@@ -189,7 +189,10 @@ export async function listPosts(workspaceId: string, limit = 50) {
   );
   if (posts.length === 0) return [];
   const targets = await q(
-    `select t.*, a.platform, a.username from post_targets t join social_accounts a on a.id=t.account_id
+    `select t.*, a.platform, a.username,
+            pm.likes as m_likes, pm.comments as m_comments, pm.saves as m_saves, pm.reach as m_reach, pm.views as m_views
+       from post_targets t join social_accounts a on a.id=t.account_id
+       left join post_metrics_latest pm on pm.target_id = t.id
       where t.post_id = any($1)`,
     [posts.map((p) => p.id)]
   );

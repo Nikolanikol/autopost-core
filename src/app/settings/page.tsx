@@ -1,13 +1,13 @@
 import { defaultWorkspaceId, q } from "@/lib/db";
 import { getTelegram } from "@/lib/notify";
 import { workspaceTz } from "@/lib/slots";
+import { fmtIn } from "@/lib/tz";
 import { deleteTemplateAction, deleteWebhookAction, revokeApiKeyAction, testWebhooksAction } from "../actions";
 import { CreateKeyForm } from "./CreateKeyForm";
 import { TelegramForm, TemplateForm, WebhookForm, WorkspaceForm } from "./SettingsForms";
 
 export const dynamic = "force-dynamic";
 
-const fmt = (d: Date | null) => (d ? new Date(d).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }) : "—");
 
 export default async function SettingsPage() {
   const ws = await defaultWorkspaceId();
@@ -18,6 +18,7 @@ export default async function SettingsPage() {
     getTelegram(ws),
     workspaceTz(ws),
   ]);
+  const fmt = (d: Date | null) => fmtIn(d, tz);
 
   return (
     <>

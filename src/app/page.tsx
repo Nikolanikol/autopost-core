@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { defaultWorkspaceId } from "@/lib/db";
 import { listPosts } from "@/lib/posts";
+import { workspaceTz } from "@/lib/slots";
+import { fmtIn, tzLabel } from "@/lib/tz";
 import { cancelPostAction, retryTargetAction } from "./actions";
 import { AutoRefresh } from "./AutoRefresh";
 
@@ -18,11 +20,12 @@ const STATUS: Record<string, string> = {
   draft: "черновик",
 };
 
-const fmt = (d: Date | null) =>
-  d ? new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Moscow" }) : "—";
 
 export default async function QueuePage() {
-  const posts = await listPosts(await defaultWorkspaceId());
+  const ws = await defaultWorkspaceId();
+  const posts = await listPosts(ws);
+  const tz = await workspaceTz(ws);
+  const fmt = (d: Date | null) => fmtIn(d, tz);
   const active = posts.some((p: any) => ["scheduled", "publishing"].includes(p.status));
 
   return (
@@ -40,7 +43,7 @@ export default async function QueuePage() {
             <thead>
               <tr>
                 <th>Медиа</th>
-                <th>Время (МСК)</th>
+                <th>Время ({tzLabel(tz)})</th>
                 <th className="hide-sm">Подпись</th>
                 <th>Платформы</th>
                 <th>Статус</th>
@@ -71,6 +74,14 @@ export default async function QueuePage() {
                         <span className={`chip s-${t.status}`}>
                           {t.platform === "instagram" ? "IG" : t.platform} @{t.username} · {STATUS[t.status] ?? t.status}
                         </span>
+                        {t.status === "published" && (t.m_likes != null || t.m_reach != null) && (
+                          <div className="muted small" title="Последний снимок статистики">
+                            ♥ {t.m_likes ?? "—"} · 💬 {t.m_comments ?? "—"}
+                            {t.m_saves != null && ` · 🔖 ${t.m_saves}`}
+                            {t.m_reach != null && ` · охват ${t.m_reach}`}
+                            {t.m_views != null && ` · просмотры ${t.m_views}`}
+                          </div>
+                        )}
                         {t.permalink && (
                           <a href={t.permalink} target="_blank" className="small"> открыть ↗</a>
                         )}

@@ -19,6 +19,8 @@ const posts: { slug: string; image: string; caption: string }[] = JSON.parse(
 );
 const schedules = process.argv.slice(2);
 const auth = { authorization: `Bearer ${KEY}` };
+// Часовой пояс только для вывода в консоль (по умолчанию — пояс этого компьютера).
+const TZ = process.env.DISPLAY_TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 for (const [i, p] of posts.entries()) {
   const fd = new FormData();
@@ -41,6 +43,6 @@ for (const [i, p] of posts.entries()) {
   const body = await res.json();
   if (!res.ok) throw new Error(`${p.slug}: ${res.status} ${JSON.stringify(body)}`);
   console.log(
-    `${res.status === 201 ? "✓ создан" : "= уже был"} ${p.slug} → ${new Date(body.post.scheduled_at).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })} МСК (${body.post.id})`
+    `${res.status === 201 ? "✓ создан" : "= уже был"} ${p.slug} → ${new Date(body.post.scheduled_at).toLocaleString("ru-RU", { timeZone: TZ })} (${TZ}) (${body.post.id})`
   );
 }

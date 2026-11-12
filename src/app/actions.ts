@@ -8,7 +8,8 @@ import { defaultWorkspaceId, one, q } from "@/lib/db";
 import { registerUpload } from "@/lib/media";
 import { emit, getTelegram, sendTelegram, type EventName } from "@/lib/notify";
 import { cancelPost, createPost, reschedulePost, retryTarget, ValidationError } from "@/lib/posts";
-import { nextFreeSlot } from "@/lib/slots";
+import { nextFreeSlot, workspaceTz } from "@/lib/slots";
+import { fmtIn, normalizeTz, tzLabel } from "@/lib/tz";
 
 export type FormState = { ok?: string; error?: string; issues?: string[]; secret?: string } | null;
 
@@ -39,8 +40,11 @@ export async function createPostAction(_: FormState, fd: FormData): Promise<Form
     );
     revalidatePath("/");
     revalidatePath("/calendar");
-    const when = r.post?.scheduled_at ? new Date(r.post.scheduled_at).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }) : "";
-    return { ok: `Пост поставлен в очередь на ${when} (МСК)`, issues: (r.warnings ?? []).map((w) => w.message) };
+    const tz = await workspaceTz(ws);
+    return {
+      ok: `Пост поставлен в очередь на ${fmtIn(r.post?.scheduled_at ?? null, tz)} (${tzLabel(tz)})`,
+      issues: (r.warnings ?? []).map((w) => w.message),
+    };
   } catch (e) {
     return { error: "Не удалось создать пост", issues: msg(e) };
   }
@@ -147,15 +151,12 @@ export async function deleteSlotAction(fd: FormData) {
 /* ───────── Настройки ───────── */
 
 export async function saveWorkspaceAction(_: FormState, fd: FormData): Promise<FormState> {
-  const tz = String(fd.get("timezone") || "");
-  try {
-    new Intl.DateTimeFormat("ru", { timeZone: tz });
-  } catch {
-    return { error: `Неизвестный часовой пояс: ${tz}` };
-  }
+  const raw = String(fd.get("timezone") || "");
+  const tz = normalizeTz(raw);
+  if (!tz) return { error: `Неизвестный часовой пояс: ${raw}` };
   await q("update workspaces set timezone=$2 where id=$1", [await defaultWorkspaceId(), tz]);
-  revalidatePath("/settings");
-  return { ok: "Сохранено" };
+  for (const p of ["/settings", "/", "/calendar", "/accounts"]) revalidatePath(p);
+  return { ok: `Сохранено: ${tz} (${tzLabel(tz)}). Слоты и календарь теперь считаются по этому поясу.` };
 }
 
 export async function createApiKeyAction(_: FormState, fd: FormData): Promise<FormState> {

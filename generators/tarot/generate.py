@@ -4,6 +4,8 @@
 Источники карт (по порядку приоритета, первая найденная версия карты побеждает):
   1. cards-pack/standard/DKMatrix_*/page.json + images/hero-landscape.webp
   2. lunar-oracle: modules/tarot/arcana/content/*.json + public/knowledge/tarot/<slug>/hero-landscape.webp
+  3. lunar-oracle: modules/tarot/knowledge/entries/NN_*.json (старшие арканы) + assets/tarot/decks/classic/<cardId>.webp
+     — другая структура, приводится к общему виду функцией from_entry()
 
 Рендерит картинку 1080×1350 (4:5, JPEG) и собирает подпись с хэштегами.
 Результат: out/<slug>.jpg и out/posts.json — их отправляет в ядро push.ts через API.
@@ -41,6 +43,17 @@ CARDS = {
     "08_strength": ("VIII", "Сила"),
     "09_the_hermit": ("IX", "Отшельник"),
     "10_wheel_of_fortune": ("X", "Колесо Фортуны"),
+    "11_justice": ("XI", "Справедливость"),
+    "12_the_hanged_man": ("XII", "Повешенный"),
+    "13_death": ("XIII", "Смерть"),
+    "14_temperance": ("XIV", "Умеренность"),
+    "15_the_devil": ("XV", "Дьявол"),
+    "16_the_tower": ("XVI", "Башня"),
+    "17_the_star": ("XVII", "Звезда"),
+    "18_the_moon": ("XVIII", "Луна"),
+    "19_the_sun": ("XIX", "Солнце"),
+    "20_judgement": ("XX", "Суд"),
+    "21_the_world": ("XXI", "Мир"),
 }
 
 BASE_TAGS = ["таро", "старшиеарканы", "арканы", "значениекарт", "картадня", "dkmatrix"]
@@ -64,10 +77,17 @@ def render(art_path: Path, page: dict, num: str, name: str, out: Path):
     art = Image.open(art_path).convert("RGB")
     # Арт крупнее: по высоте ART_H, по ширине обрезка по центру.
     art_h = 780
-    scaled_w = round(art.width * art_h / art.height)
-    art = art.resize((scaled_w, art_h), Image.LANCZOS)
-    left = (scaled_w - W) // 2
-    art = art.crop((left, 0, left + W, art_h))
+    if art.height > art.width:
+        # Портретная карта колоды: по ширине кадра, окно чуть выше центра (там обычно фигура).
+        scaled_h = round(art.height * W / art.width)
+        art = art.resize((W, scaled_h), Image.LANCZOS)
+        top = round((scaled_h - art_h) * 0.38)
+        art = art.crop((0, top, W, top + art_h))
+    else:
+        scaled_w = round(art.width * art_h / art.height)
+        art = art.resize((scaled_w, art_h), Image.LANCZOS)
+        left = (scaled_w - W) // 2
+        art = art.crop((left, 0, left + W, art_h))
 
     img = Image.new("RGB", (W, H), BG)
     # Размытая подложка из того же арта для глубины.
@@ -98,11 +118,12 @@ def render(art_path: Path, page: dict, num: str, name: str, out: Path):
     centered(d, y, page["lead"], font("Georgia.ttf", 31), MUTED, 50, 10)
 
     quote = page.get("quote")
-    if isinstance(quote, str) and quote:
+    bottom = f"«{quote}»" if isinstance(quote, str) and quote else page.get("image_question")
+    if bottom:
         f_q = font("Georgia Italic.ttf", 28)
-        lines = textwrap.wrap(f"«{quote}»", 52)
+        lines = textwrap.wrap(bottom, 52)
         a, dsc = f_q.getmetrics()
-        centered(d, H - 110 - len(lines) * (a + dsc + 8), f"«{quote}»", f_q, (150, 140, 160), 52, 8)
+        centered(d, H - 110 - len(lines) * (a + dsc + 8), bottom, f_q, (150, 140, 160), 52, 8)
 
     f_brand = font("Arial.ttf", 22)
     brand = "D K   M A T R I X"
@@ -130,6 +151,28 @@ def caption(page: dict, num: str, name: str) -> str:
     return text
 
 
+def from_entry(e: dict) -> dict:
+    """Запись базы знаний (knowledge/entries) → общий формат page.json."""
+    kw = e.get("keywords", [])
+    first = e["coreMeaning"].split(". ")[0].rstrip(".") + "."
+    q = e.get("reflectionQuestions", [])
+    return {
+        "cardId": e["cardId"],
+        "slug": e["cardId"].split("_", 1)[1].replace("_", "-"),
+        "status": e.get("review", {}).get("status"),
+        "headline": f"{kw[0].capitalize()} и {kw[1]}" if len(kw) > 1 else e["name"],
+        "lead": first,
+        "summary": e["summary"],
+        "light": e.get("constructive", [])[:1] or [""],
+        "shadow": e.get("challenges", [])[:1] or [""],
+        "meaning": {"advice": e["advice"]},
+        "reflection": {"questions": q},
+        "keywords": kw,
+        "quote": None,
+        "image_question": f"Вопрос для себя: {q[0]}" if q else None,
+    }
+
+
 def iter_cards():
     """(page, art_path) из всех источников; cards-pack важнее lunar-oracle."""
     for d in sorted(CARDS_PACK.glob("DKMatrix_*")):
@@ -140,6 +183,11 @@ def iter_cards():
         art = LUNAR / "public/knowledge/tarot" / page["slug"] / "hero-landscape.webp"
         if art.exists():
             yield page, art
+    for f in sorted((LUNAR / "modules/tarot/knowledge/entries").glob("[0-2][0-9]_*.json")):
+        e = json.loads(f.read_text())
+        art = LUNAR / "assets/tarot/decks/classic" / f"{e['cardId']}.webp"
+        if art.exists():
+            yield from_entry(e), art
 
 
 def main():

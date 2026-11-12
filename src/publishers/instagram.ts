@@ -1,5 +1,14 @@
 // Instagram через Graph API (проверено 12.11.2026: фото и Reels, токен системного пользователя).
-import { PlatformError, type ErrorClass, type Issue, type MediaItem, type PublishContext, type Publisher } from "./types";
+import {
+  PlatformError,
+  type AccountMetrics,
+  type ErrorClass,
+  type Issue,
+  type MediaItem,
+  type PostMetrics,
+  type PublishContext,
+  type Publisher,
+} from "./types";
 
 const VERSION = process.env.GRAPH_VERSION || "v24.0";
 
@@ -134,4 +143,73 @@ export const instagram: Publisher = {
     const d = r.data?.[0];
     return d ? { used: d.quota_usage, total: d.config?.quota_total ?? 100 } : null;
   },
+
+  async postMetrics(mediaId, token) {
+    const out: PostMetrics = { raw: {}, notes: [] };
+    // Базовые счётчики доступны с instagram_basic.
+    const basic = await api<{ like_count?: number; comments_count?: number; media_product_type?: string }>(
+      token,
+      "GET",
+      mediaId,
+      { fields: "like_count,comments_count,media_product_type" }
+    );
+    out.likes = basic.like_count ?? null;
+    out.comments = basic.comments_count ?? null;
+    out.raw.basic = basic;
+    // Расширенные — нужен instagram_manage_insights (или instagram_business_manage_insights).
+    const ins = await insights(token, `${mediaId}/insights`, ["reach", "saved", "shares", "views"], {}, out.notes);
+    out.raw.insights = ins;
+    out.reach = ins.reach ?? null;
+    out.saves = ins.saved ?? null;
+    out.shares = ins.shares ?? null;
+    out.views = ins.views ?? null;
+    return out;
+  },
+
+  async accountMetrics(externalId, token) {
+    const out: AccountMetrics = { raw: {}, notes: [] };
+    const basic = await api<{ followers_count?: number; media_count?: number }>(token, "GET", externalId, {
+      fields: "followers_count,media_count",
+    });
+    out.followers = basic.followers_count ?? null;
+    out.media_count = basic.media_count ?? null;
+    out.raw.basic = basic;
+    const ins = await insights(token, `${externalId}/insights`, ["reach", "views"], { period: "day", metric_type: "total_value" }, out.notes);
+    out.raw.insights = ins;
+    out.reach_day = ins.reach ?? null;
+    out.views_day = ins.views ?? null;
+    return out;
+  },
 };
+
+/**
+ * Запрашивает insights; при «неизвестной метрике» пробует метрики по одной,
+ * при нехватке прав — возвращает пусто и пишет заметку (аккаунт не трогаем).
+ */
+async function insights(
+  token: string,
+  path: string,
+  metrics: string[],
+  extra: Record<string, string>,
+  notes: string[]
+): Promise<Record<string, number>> {
+  const parse = (r: { data?: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }) =>
+    Object.fromEntries(
+      (r.data ?? []).map((m) => [m.name, m.total_value?.value ?? m.values?.[m.values.length - 1]?.value ?? 0])
+    ) as Record<string, number>;
+  try {
+    return parse(await api(token, "GET", path, { metric: metrics.join(","), ...extra }));
+  } catch (e) {
+    if (e instanceof PlatformError && (e.code === 10 || e.code === 200 || e.code === 190)) {
+      notes.push(`insights недоступны: ${e.message}`);
+      return {};
+    }
+    if (metrics.length === 1) {
+      notes.push(`${metrics[0]}: ${(e as Error).message}`);
+      return {};
+    }
+    const res: Record<string, number> = {};
+    for (const m of metrics) Object.assign(res, await insights(token, path, [m], extra, notes));
+    return res;
+  }
+}
