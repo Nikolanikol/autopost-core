@@ -106,6 +106,16 @@ export function NewPostForm({ accounts, media, templates }: { accounts: Account[
           {caption.length} / 2200 · хэштегов: {(caption.match(/#[\p{L}\d_]+/gu) ?? []).length} / 30
         </div>
 
+        <label htmlFor="first_comment">Первый комментарий <span className="muted small">(необязательно, оставит аккаунт сразу после публикации)</span></label>
+        <Area id="first_comment" name="first_comment" maxLength={2200} rows={2} placeholder="Например: Следующей частью — … Интересно? 👇" />
+        {previewKind === "video" && (
+          <>
+            <label htmlFor="cover_sec">Кадр обложки, секунда видео <span className="muted small">(необязательно; обложка берётся из этого кадра)</span></label>
+            <Input id="cover_sec" name="cover_sec" type="number" min={0} step={0.1} placeholder="например 4.5" style={{ maxWidth: 200 }} />
+          </>
+        )}
+        <Check name="ai_generated">Метка «создано ИИ» (AI info) — если в ролике есть ИИ-материалы</Check>
+
         <label>Аккаунты</label>
         {accounts.map((a) => (
           <Check

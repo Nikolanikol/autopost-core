@@ -308,7 +308,10 @@ export function buildServer(ctx: ApiKeyContext) {
       accounts: z.array(z.string()).min(1).describe("@username или id аккаунтов бренда"),
       type: z.enum(["reel", "feed", "story"]).optional().describe("По умолчанию: видео → reel, фото → feed"),
       share_to_feed: z.boolean().optional().describe("Reels: показывать ещё и в ленте (по умолчанию да)"),
-      cover_url: z.string().url().optional().describe("Reels: обложка"),
+      cover_url: z.string().url().optional().describe("Reels: обложка картинкой (приоритетнее кадра)"),
+      cover_time_sec: z.number().min(0).optional().describe("Reels: обложка из кадра видео на этой секунде (например 4.5)"),
+      first_comment: z.string().max(2200).optional().describe("Первый комментарий: аккаунт оставит его сразу после публикации"),
+      ai_generated: z.boolean().optional().describe("Поставить метку «создано ИИ» (AI info)"),
       schedule: z.string().describe("'next_slot' (рекомендуется), 'now' или ISO-время со смещением, напр. 2026-12-01T10:00:00+03:00"),
       idempotency_key: z.string().max(200).optional().describe("Повтор с тем же ключом не создаст дубль"),
       dry_run: z.boolean().default(false),
@@ -322,6 +325,9 @@ export function buildServer(ctx: ApiKeyContext) {
       if (a.type) options.type = a.type;
       if (a.share_to_feed === false) options.share_to_feed = false;
       if (a.cover_url) options.cover_url = a.cover_url;
+      if (a.cover_time_sec != null) options.cover_offset_ms = Math.round(a.cover_time_sec * 1000);
+      if (a.first_comment?.trim()) options.first_comment = a.first_comment.trim();
+      if (a.ai_generated) options.ai_generated = true;
       if (!/^(now|next_slot)$/.test(a.schedule) && Number.isNaN(Date.parse(a.schedule)))
         throw new ToolError("schedule: 'now', 'next_slot' или ISO-время со смещением, напр. 2026-12-01T10:00:00+03:00");
 

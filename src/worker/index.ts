@@ -112,6 +112,28 @@ async function handle(job: PublishJob, retryCount: number, retryLimit: number) {
     await log(t.id, "finish", true, { externalId, permalink });
     console.log(`✅ ${t.platform} @${t.username}: ${permalink ?? externalId}`);
     await emit(t.workspace_id, "post.published", { ...ev, external_id: externalId, permalink });
+
+    // Первый комментарий: после публикации, с повторами. Неудача не отменяет публикацию — пишем причину в карточку цели.
+    const fc = typeof ctx.options.first_comment === "string" ? ctx.options.first_comment.trim() : "";
+    if (fc && pub.commentOnMedia && !(await one("select 1 from publish_logs where target_id=$1 and step='first_comment' and ok limit 1", [t.id]))) {
+      let lastErr = "";
+      for (let i = 0; i < 3; i++) {
+        await new Promise((r) => setTimeout(r, i === 0 ? 4000 : 8000 * i));
+        try {
+          const c = await pub.commentOnMedia(externalId, fc, ctx.account.token);
+          await log(t.id, "first_comment", true, { id: c.id });
+          lastErr = "";
+          break;
+        } catch (e) {
+          lastErr = errInfo(e).message;
+        }
+      }
+      if (lastErr) {
+        await log(t.id, "first_comment", false, { error: lastErr });
+        await setTarget(t.id, { last_error: `Пост опубликован, но первый комментарий не отправлен: ${lastErr}` });
+        console.error(`⚠️ первый комментарий @${t.username}: ${lastErr}`);
+      }
+    }
   } catch (e) {
     const cls = (e as any)?.fatal ? "fatal" : pub.classifyError(e);
     const info = errInfo(e);

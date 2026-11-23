@@ -60,6 +60,19 @@ export const instagram: Publisher = {
           message: "Файл доступен только локально: Instagram скачивает медиа сам, нужен PUBLIC_BASE_URL с https (сервер или туннель)",
         });
       if (type === "reel" && m.kind !== "video") issues.push({ level: "error", message: "Reel должен быть видео" });
+      const o = options as Record<string, unknown>;
+      if (o.first_comment != null && (typeof o.first_comment !== "string" || o.first_comment.length > 2200))
+        issues.push({ level: "error", message: "Первый комментарий: текст до 2200 символов" });
+      if (o.ai_generated != null && typeof o.ai_generated !== "boolean")
+        issues.push({ level: "error", message: "ai_generated: нужно true или false" });
+      if (o.cover_offset_ms != null) {
+        const n = Number(o.cover_offset_ms);
+        if (!Number.isFinite(n) || n < 0) issues.push({ level: "error", message: "Кадр обложки: время в миллисекундах от начала, не меньше 0" });
+        else if (m.duration_sec != null && n / 1000 > m.duration_sec)
+          issues.push({ level: "error", message: `Кадр обложки (${(n / 1000).toFixed(1)} с) за пределами видео (${m.duration_sec} с)` });
+        if (type !== "reel") issues.push({ level: "warning", message: "Обложка по кадру применяется только к Reels" });
+        if (typeof o.cover_url === "string") issues.push({ level: "warning", message: "Заданы и cover_url, и кадр обложки — Instagram использует cover_url" });
+      }
       if (type === "feed" && m.kind === "video")
         issues.push({ level: "error", message: "Видео в ленту публикуется как Reel (type=reel)" });
       if (m.kind === "image" && m.width && m.height) {
@@ -81,6 +94,8 @@ export const instagram: Publisher = {
     const m = ctx.media[0];
     const type = (ctx.options.type as string) ?? (m.kind === "video" ? "reel" : "feed");
     const params: Record<string, string> = {};
+    // Метка «создано ИИ» (AI info): параметр контейнера публикации.
+    if (ctx.options.ai_generated === true) params.is_ai_generated = "true";
     if (type === "story") {
       params.media_type = "STORIES";
       params[m.kind === "video" ? "video_url" : "image_url"] = m.public_url;
@@ -90,6 +105,9 @@ export const instagram: Publisher = {
       params.caption = ctx.caption;
       if (ctx.options.share_to_feed === false) params.share_to_feed = "false";
       if (typeof ctx.options.cover_url === "string") params.cover_url = ctx.options.cover_url;
+      // Обложка по кадру видео: смещение в миллисекундах (cover_url, если задан, имеет приоритет).
+      else if (ctx.options.cover_offset_ms != null && Number.isFinite(Number(ctx.options.cover_offset_ms)))
+        params.thumb_offset = String(Math.max(0, Math.round(Number(ctx.options.cover_offset_ms))));
     } else {
       params.image_url = m.public_url;
       params.caption = ctx.caption;
@@ -332,6 +350,11 @@ export const instagram: Publisher = {
       }
     }
     return out;
+  },
+
+  async commentOnMedia(mediaId, text, token) {
+    const r = await api<{ id: string }>(token, "POST", `${mediaId}/comments`, { message: text });
+    return { id: r.id };
   },
 
   async replyToComment(commentId, text, token) {

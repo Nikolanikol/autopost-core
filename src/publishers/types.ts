@@ -61,6 +61,8 @@ export interface Publisher {
   hideComment?(commentId: string, hide: boolean, token: string): Promise<void>;
   /** Личное сообщение автору комментария (одно, в течение 7 дней после комментария). */
   privateReply?(externalId: string, commentId: string, text: string, token: string): Promise<void>;
+  /** Комментарий от имени аккаунта под опубликованной публикацией (первый комментарий). */
+  commentOnMedia?(mediaId: string, text: string, token: string): Promise<{ id: string }>;
 }
 
 export interface CommentItem {

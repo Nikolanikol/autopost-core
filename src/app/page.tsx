@@ -81,6 +81,8 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                         <span className={`chip s-${t.status}`}>
                           {t.platform === "instagram" ? "IG" : t.platform} @{t.username} · {STATUS[t.status] ?? t.status}
                         </span>
+                        {t.options?.ai_generated === true && <span className="chip" style={{ marginLeft: 6 }} title="Метка «создано ИИ»">ИИ</span>}
+                        {t.options?.first_comment && <span className="chip" style={{ marginLeft: 6 }} title={String(t.options.first_comment)}>💬 1-й коммент</span>}
                         {t.status === "published" && (t.m_likes != null || t.m_reach != null) && (
                           <div className="muted small" title="Последний снимок статистики">
                             ♥ {t.m_likes ?? "—"} · 💬 {t.m_comments ?? "—"}

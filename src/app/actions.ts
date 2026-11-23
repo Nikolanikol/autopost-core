@@ -27,13 +27,20 @@ export async function createPostAction(_: FormState, fd: FormData): Promise<Form
     const mediaId = String(fd.get("media_id") || "");
     const mediaUrl = String(fd.get("media_url") || "").trim();
     if (!mediaId && !mediaUrl) return { error: "Выберите медиа из медиатеки или укажите URL" };
+    // Доп. параметры публикации: метка ИИ, первый комментарий, кадр обложки (секунды → миллисекунды).
+    const options: Record<string, unknown> = type === "auto" ? {} : { type };
+    const firstComment = String(fd.get("first_comment") ?? "").trim();
+    if (firstComment) options.first_comment = firstComment;
+    if (fd.get("ai_generated") === "on") options.ai_generated = true;
+    const coverRaw = String(fd.get("cover_sec") ?? "").trim();
+    if (coverRaw && Number.isFinite(Number(coverRaw)) && Number(coverRaw) >= 0) options.cover_offset_ms = Math.round(Number(coverRaw) * 1000);
     const r = await createPost(
       ws,
       {
         caption: String(fd.get("caption") ?? ""),
         media_ids: mediaId ? [mediaId] : [],
         media_urls: !mediaId && mediaUrl ? [mediaUrl] : [],
-        targets: accountIds.map((account_id) => ({ account_id, options: type === "auto" ? {} : { type } })),
+        targets: accountIds.map((account_id) => ({ account_id, options })),
         schedule: String(fd.get("schedule_iso") || "now"),
       },
       "ui"
