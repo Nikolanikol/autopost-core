@@ -171,21 +171,24 @@ export async function reschedulePost(postId: string, at: Date) {
   });
 }
 
-export async function listPostsBetween(workspaceId: string, from: Date, to: Date) {
+export async function listPostsBetween(workspaceId: string, from: Date, to: Date, accountId?: string | null) {
   return q(
     `select p.id, p.status, p.scheduled_at, p.base_caption,
             json_agg(json_build_object('platform', a.platform, 'username', a.username, 'status', t.status)) as targets
        from posts p join post_targets t on t.post_id = p.id join social_accounts a on a.id = t.account_id
       where p.workspace_id=$1 and p.scheduled_at >= $2 and p.scheduled_at < $3
+        and ($4::uuid is null or exists (select 1 from post_targets f where f.post_id = p.id and f.account_id = $4))
       group by p.id order by p.scheduled_at`,
-    [workspaceId, from, to]
+    [workspaceId, from, to, accountId ?? null]
   );
 }
 
-export async function listPosts(workspaceId: string, limit = 50) {
+export async function listPosts(workspaceId: string, limit = 50, accountId?: string | null) {
   const posts = await q(
-    "select * from posts where workspace_id=$1 order by coalesce(scheduled_at, created_at) desc limit $2",
-    [workspaceId, limit]
+    `select * from posts p where p.workspace_id=$1
+        and ($3::uuid is null or exists (select 1 from post_targets f where f.post_id = p.id and f.account_id = $3))
+      order by coalesce(p.scheduled_at, p.created_at) desc limit $2`,
+    [workspaceId, limit, accountId ?? null]
   );
   if (posts.length === 0) return [];
   const targets = await q(

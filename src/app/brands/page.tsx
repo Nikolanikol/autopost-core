@@ -1,5 +1,6 @@
 import { defaultWorkspaceId, q } from "@/lib/db";
 import { createBrandAction, deleteBrandAction, moveAccountAction, renameBrandAction, switchBrandAction } from "./actions";
+import { Button, Dropdown, Input } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +35,8 @@ export default async function BrandsPage() {
             <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
               <form action={renameBrandAction} className="row" style={{ gap: 8, flex: 1, minWidth: 220 }}>
                 <input type="hidden" name="id" value={b.id} />
-                <input type="text" name="name" defaultValue={b.name} aria-label="Название бренда" style={{ maxWidth: 260, fontWeight: 600 }} />
-                <button className="ghost small" style={{ padding: "4px 10px" }}>Переименовать</button>
+                <Input type="text" name="name" defaultValue={b.name} aria-label="Название бренда" style={{ maxWidth: 260, fontWeight: 600 }} />
+                <Button className="ghost small" style={{ padding: "4px 10px" }}>Переименовать</Button>
               </form>
               <div className="row" style={{ gap: 8 }}>
                 {b.id === current ? (
@@ -43,13 +44,13 @@ export default async function BrandsPage() {
                 ) : (
                   <form action={switchBrandAction}>
                     <input type="hidden" name="brand" value={b.id} />
-                    <button style={{ padding: "4px 12px" }}>Открыть</button>
+                    <Button style={{ padding: "4px 12px" }}>Открыть</Button>
                   </form>
                 )}
                 {empty && brands.length > 1 && (
                   <form action={deleteBrandAction}>
                     <input type="hidden" name="id" value={b.id} />
-                    <button className="danger" style={{ padding: "4px 12px" }}>Удалить</button>
+                    <Button className="danger" style={{ padding: "4px 12px" }}>Удалить</Button>
                   </form>
                 )}
               </div>
@@ -71,10 +72,9 @@ export default async function BrandsPage() {
                   ) : (
                     <form action={moveAccountAction} className="row" style={{ gap: 6 }}>
                       <input type="hidden" name="account_id" value={a.id} />
-                      <select name="brand" defaultValue={b.id} style={{ width: "auto" }} aria-label="Перенести в бренд">
-                        {brands.map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                      </select>
-                      <button className="ghost small" style={{ padding: "4px 10px" }}>Перенести</button>
+                      <Dropdown name="brand" defaultValue={b.id} width="auto" size="1" ariaLabel="Перенести в бренд"
+                        options={brands.map((x: any) => ({ value: x.id, label: x.name }))} />
+                      <Button className="ghost small" style={{ padding: "4px 10px" }}>Перенести</Button>
                     </form>
                   ))}
               </div>
@@ -85,8 +85,8 @@ export default async function BrandsPage() {
 
       <h2>Новый бренд</h2>
       <form action={createBrandAction} className="card row" style={{ gap: 10 }}>
-        <input type="text" name="name" placeholder="Название, например Axis" required style={{ maxWidth: 320 }} />
-        <button>Создать и открыть</button>
+        <Input type="text" name="name" placeholder="Название, например Axis" required style={{ maxWidth: 320 }} />
+        <Button>Создать и открыть</Button>
         <span className="muted small">Часовой пояс возьмётся от текущего бренда, его можно поменять в «Настройках».</span>
       </form>
     </>

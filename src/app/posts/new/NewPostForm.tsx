@@ -1,7 +1,9 @@
 "use client";
 
+import { RadioGroup } from "@radix-ui/themes";
 import { useActionState, useEffect, useState } from "react";
 import { createPostAction, previewNextSlotAction, type FormState } from "../../actions";
+import { Area, Button, Check, Dropdown, Input } from "@/components/ui";
 
 type Account = { id: string; platform: string; username: string };
 type Media = { id: string; kind: "image" | "video"; url: string; width: number | null; height: number | null; warnings: string[] };
@@ -44,12 +46,12 @@ export function NewPostForm({ accounts, media, templates }: { accounts: Account[
       <form action={action} className="card">
         <label>Медиа</label>
         <div className="tabs">
-          <button type="button" className={source === "library" ? "" : "ghost"} onClick={() => setSource("library")}>
+          <Button type="button" className={source === "library" ? "" : "ghost"} onClick={() => setSource("library")}>
             Из медиатеки
-          </button>
-          <button type="button" className={source === "url" ? "" : "ghost"} onClick={() => setSource("url")}>
+          </Button>
+          <Button type="button" className={source === "url" ? "" : "ghost"} onClick={() => setSource("url")}>
             По ссылке
-          </button>
+          </Button>
         </div>
         {source === "library" ? (
           media.length === 0 ? (
@@ -76,64 +78,62 @@ export function NewPostForm({ accounts, media, templates }: { accounts: Account[
             </div>
           )
         ) : (
-          <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…/video.mp4 или фото .jpg" />
+          <Input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…/video.mp4 или фото .jpg" />
         )}
         <input type="hidden" name="media_id" value={source === "library" ? mediaId : ""} />
         <input type="hidden" name="media_url" value={source === "url" ? url : ""} />
 
         <label htmlFor="type">Формат</label>
-        <select id="type" name="type" value={type} onChange={(e) => setType(e.target.value)}>
-          <option value="auto">Авто (фото → лента, видео → Reel)</option>
-          <option value="feed">Пост в ленту (фото)</option>
-          <option value="reel">Reel (видео)</option>
-          <option value="story">История</option>
-        </select>
+        <Dropdown name="type" value={type} onValueChange={setType} ariaLabel="Формат" options={[
+          { value: "auto", label: "Авто (фото → лента, видео → Reel)" },
+          { value: "feed", label: "Пост в ленту (фото)" },
+          { value: "reel", label: "Reel (видео)" },
+          { value: "story", label: "История" },
+        ]} />
 
         <label htmlFor="caption">Подпись</label>
         {templates.length > 0 && (
           <div className="tabs">
             {templates.map((t) => (
-              <button key={t.id} type="button" className="ghost small" onClick={() => insert(t.body)} title={t.body}>
+              <Button key={t.id} type="button" className="ghost small" onClick={() => insert(t.body)} title={t.body}>
                 {t.kind === "hashtags" ? "#" : "+"} {t.name}
-              </button>
+              </Button>
             ))}
           </div>
         )}
-        <textarea id="caption" name="caption" maxLength={2200} value={caption} onChange={(e) => setCaption(e.target.value)} />
+        <Area id="caption" name="caption" maxLength={2200} value={caption} onChange={(e) => setCaption(e.target.value)} />
         <div className="muted small">
           {caption.length} / 2200 · хэштегов: {(caption.match(/#[\p{L}\d_]+/gu) ?? []).length} / 30
         </div>
 
         <label>Аккаунты</label>
         {accounts.map((a) => (
-          <label key={a.id} className="check">
-            <input
-              type="checkbox"
-              name="account_id"
-              value={a.id}
-              checked={selected.includes(a.id)}
-              onChange={(e) => setSelected((s) => (e.target.checked ? [...s, a.id] : s.filter((x) => x !== a.id)))}
-            />
+          <Check
+            key={a.id}
+            name="account_id"
+            value={a.id}
+            checked={selected.includes(a.id)}
+            onCheckedChange={(on) => setSelected((s) => (on ? [...s, a.id] : s.filter((x) => x !== a.id)))}
+          >
             {a.platform === "instagram" ? "Instagram" : a.platform} · @{a.username}
-          </label>
+          </Check>
         ))}
 
         <label>Когда</label>
-        <label className="check">
-          <input type="radio" checked={when === "now"} onChange={() => setWhen("now")} /> Сейчас
-        </label>
-        <label className="check">
-          <input type="radio" checked={when === "slot"} onChange={() => setWhen("slot")} /> В ближайший свободный слот
-          {when === "slot" && (
-            <span className="muted small">
-              {slot === undefined ? "…" : slot ? `→ ${fmt(slot)}` : "→ у аккаунта нет слотов (Аккаунты → Слоты)"}
-            </span>
-          )}
-        </label>
-        <label className="check">
-          <input type="radio" checked={when === "later"} onChange={() => setWhen("later")} /> В указанное время
-        </label>
-        {when === "later" && <input type="datetime-local" value={local} onChange={(e) => setLocal(e.target.value)} required />}
+        <RadioGroup.Root value={when} onValueChange={(v) => setWhen(v as "now" | "later" | "slot")}>
+          <RadioGroup.Item value="now">Сейчас</RadioGroup.Item>
+          <RadioGroup.Item value="slot">
+            В ближайший свободный слот
+            {when === "slot" && (
+              <span className="muted small">
+                {" "}
+                {slot === undefined ? "…" : slot ? `→ ${fmt(slot)}` : "→ у аккаунта нет слотов (Аккаунты → Слоты)"}
+              </span>
+            )}
+          </RadioGroup.Item>
+          <RadioGroup.Item value="later">В указанное время</RadioGroup.Item>
+        </RadioGroup.Root>
+        {when === "later" && <Input type="datetime-local" value={local} onChange={(e) => setLocal(e.target.value)} required />}
         <input type="hidden" name="schedule_iso" value={scheduleIso} />
 
         {state?.error && (
@@ -150,9 +150,9 @@ export function NewPostForm({ accounts, media, templates }: { accounts: Account[
         )}
 
         <div style={{ marginTop: 16 }}>
-          <button disabled={pending || (when === "slot" && !slot)}>
+          <Button disabled={pending || (when === "slot" && !slot)}>
             {pending ? "Проверяю медиа…" : when === "now" ? "Опубликовать" : "Запланировать"}
-          </button>
+          </Button>
         </div>
       </form>
 
@@ -178,9 +178,9 @@ export function NewPostForm({ accounts, media, templates }: { accounts: Account[
                 <>
                   <b>{me?.username ?? "аккаунт"}</b> {capShort ? caption.slice(0, 125) + "… " : caption}
                   {capShort && (
-                    <button type="button" className="ghost small" style={{ padding: 0, border: 0 }} onClick={() => setShowMore(true)}>
+                    <Button type="button" className="ghost small" style={{ padding: 0, border: 0 }} onClick={() => setShowMore(true)}>
                       ещё
-                    </button>
+                    </Button>
                   )}
                 </>
               ) : (

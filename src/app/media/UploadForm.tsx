@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { uploadMediaAction, type FormState } from "../actions";
+import { Button } from "@/components/ui";
 
 export function UploadForm() {
   const [state, action, pending] = useActionState<FormState, FormData>(uploadMediaAction, null);
@@ -9,7 +10,7 @@ export function UploadForm() {
     <form action={action} className="card">
       <div className="row">
         <input type="file" name="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" required />
-        <button disabled={pending}>{pending ? "Загружаю и проверяю…" : "Загрузить"}</button>
+        <Button disabled={pending}>{pending ? "Загружаю и проверяю…" : "Загрузить"}</Button>
       </div>
       <div className="muted small" style={{ marginTop: 6 }}>
         Для Instagram: фото JPEG (4:5…1.91:1), видео MP4 H.264 + AAC, лучше 9:16. До 300 МБ.

@@ -3,6 +3,7 @@ import { listMedia } from "@/lib/media";
 import { publicBaseUrl } from "@/lib/storage";
 import { deleteMediaAction } from "../actions";
 import { UploadForm } from "./UploadForm";
+import { Button } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export default async function MediaPage() {
                 {m.used === 0 && (
                   <form action={deleteMediaAction}>
                     <input type="hidden" name="media_id" value={m.id} />
-                    <button className="danger small" style={{ padding: "2px 8px" }}>Удалить</button>
+                    <Button className="danger small" style={{ padding: "2px 8px" }}>Удалить</Button>
                   </form>
                 )}
               </div>

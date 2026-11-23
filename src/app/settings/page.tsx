@@ -5,6 +5,7 @@ import { fmtIn } from "@/lib/tz";
 import { deleteTemplateAction, deleteWebhookAction, revokeApiKeyAction, testWebhooksAction } from "../actions";
 import { CreateKeyForm } from "./CreateKeyForm";
 import { TelegramForm, TemplateForm, WebhookForm, WorkspaceForm } from "./SettingsForms";
+import { Button } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function SettingsPage() {
                   <td style={{ width: 90 }}>
                     <form action={deleteTemplateAction}>
                       <input type="hidden" name="template_id" value={t.id} />
-                      <button className="danger small" style={{ padding: "2px 8px" }}>Удалить</button>
+                      <Button className="danger small" style={{ padding: "2px 8px" }}>Удалить</Button>
                     </form>
                   </td>
                 </tr>
@@ -82,7 +83,7 @@ export default async function SettingsPage() {
                   <td>
                     <form action={deleteWebhookAction}>
                       <input type="hidden" name="webhook_id" value={h.id} />
-                      <button className="danger small" style={{ padding: "2px 8px" }}>Удалить</button>
+                      <Button className="danger small" style={{ padding: "2px 8px" }}>Удалить</Button>
                     </form>
                   </td>
                 </tr>
@@ -90,7 +91,7 @@ export default async function SettingsPage() {
             </tbody>
           </table>
           <form action={testWebhooksAction} style={{ padding: 12 }}>
-            <button className="ghost small">Отправить тестовое событие post.published</button>
+            <Button className="ghost small">Отправить тестовое событие post.published</Button>
           </form>
         </div>
       )}
@@ -115,7 +116,7 @@ export default async function SettingsPage() {
                   ) : (
                     <form action={revokeApiKeyAction}>
                       <input type="hidden" name="key_id" value={k.id} />
-                      <button className="danger small" style={{ padding: "2px 8px" }}>Отозвать</button>
+                      <Button className="danger small" style={{ padding: "2px 8px" }}>Отозвать</Button>
                     </form>
                   )}
                 </td>

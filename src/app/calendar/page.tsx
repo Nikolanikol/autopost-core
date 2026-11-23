@@ -3,18 +3,23 @@ import { defaultWorkspaceId } from "@/lib/db";
 import { listPostsBetween } from "@/lib/posts";
 import { workspaceTz } from "@/lib/slots";
 import { dayKey, wallTime, zonedToUtc } from "@/lib/tz";
+import { AccountFilter } from "../AccountFilter";
 import { AutoRefresh } from "../AutoRefresh";
 import { Calendar, type CalDay, type CalPost } from "./Calendar";
+import { Button } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 const MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 
-export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
+export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ m?: string; account?: string }> }) {
   const ws = await defaultWorkspaceId();
   const tz = await workspaceTz(ws);
   const now = wallTime(new Date(), tz);
-  const m = (await searchParams).m?.match(/^(\d{4})-(\d{2})$/);
+  const sp = await searchParams;
+  const account = sp.account && /^[0-9a-f-]{36}$/i.test(sp.account) ? sp.account : null;
+  const acc = account ? `&account=${account}` : "";
+  const m = sp.m?.match(/^(\d{4})-(\d{2})$/);
   const year = m ? +m[1] : now.year;
   const month = m ? +m[2] : now.month;
 
@@ -34,7 +39,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   }
   const [fy, fm, fd] = days[0].key.split("-").map(Number);
   const [ly, lm, ld] = days[41].key.split("-").map(Number);
-  const rows = await listPostsBetween(ws, zonedToUtc(fy, fm, fd, 0, 0, tz), zonedToUtc(ly, lm, ld + 1, 0, 0, tz));
+  const rows = await listPostsBetween(ws, zonedToUtc(fy, fm, fd, 0, 0, tz), zonedToUtc(ly, lm, ld + 1, 0, 0, tz), account);
 
   const posts: CalPost[] = rows.map((p: any) => {
     const w = wallTime(p.scheduled_at, tz);
@@ -60,12 +65,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           {MONTHS[month - 1]} {year}
         </h1>
         <div className="row" style={{ gap: 8 }}>
-          <Link href={`/calendar?m=${prev}`}><button className="ghost">←</button></Link>
-          <Link href="/calendar"><button className="ghost">Сегодня</button></Link>
-          <Link href={`/calendar?m=${next}`}><button className="ghost">→</button></Link>
-          <Link href="/posts/new"><button>+ Пост</button></Link>
+          <Link href={`/calendar?m=${prev}${acc}`}><Button className="ghost">←</Button></Link>
+          <Link href={account ? `/calendar?account=${account}` : "/calendar"}><Button className="ghost">Сегодня</Button></Link>
+          <Link href={`/calendar?m=${next}${acc}`}><Button className="ghost">→</Button></Link>
+          <Link href="/posts/new"><Button>+ Пост</Button></Link>
         </div>
       </div>
+      <AccountFilter workspaceId={ws} base="/calendar" active={account} params={sp.m ? { m: sp.m } : {}} />
       <p className="muted small">
         Часовой пояс: {tz}. Запланированные посты можно перетаскивать на другой день — время сохранится.
       </p>

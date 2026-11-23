@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { defaultWorkspaceId, q } from "@/lib/db";
 import { createRuleAction, deleteRuleAction, toggleRuleAction } from "../actions";
+import { Area, Button, Check, Dropdown, Input } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -48,18 +49,18 @@ export default async function RulesPage() {
               <form action={toggleRuleAction}>
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="field" value="auto" />
-                <button className={r.auto ? "" : "ghost"} style={{ padding: "2px 10px" }} title="Отправлять без подтверждения">
+                <Button className={r.auto ? "" : "ghost"} style={{ padding: "2px 10px" }} title="Отправлять без подтверждения">
                   {r.auto ? "Авто: вкл" : "Авто: выкл"}
-                </button>
+                </Button>
               </form>
               <form action={toggleRuleAction}>
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="field" value="active" />
-                <button className="ghost" style={{ padding: "2px 10px" }}>{r.active ? "Выключить" : "Включить"}</button>
+                <Button className="ghost" style={{ padding: "2px 10px" }}>{r.active ? "Выключить" : "Включить"}</Button>
               </form>
               <form action={deleteRuleAction}>
                 <input type="hidden" name="id" value={r.id} />
-                <button className="danger" style={{ padding: "2px 10px" }}>Удалить</button>
+                <Button className="danger" style={{ padding: "2px 10px" }}>Удалить</Button>
               </form>
             </div>
           </div>
@@ -75,28 +76,21 @@ export default async function RulesPage() {
       <h2>Новое правило</h2>
       <form action={createRuleAction} className="card">
         <label>Название</label>
-        <input type="text" name="name" placeholder="Вопрос про цену" required />
+        <Input type="text" name="name" placeholder="Вопрос про цену" required />
         <label>Для аккаунта</label>
-        <select name="account_id" defaultValue="">
-          <option value="">Все аккаунты</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>@{a.username}</option>)}
-        </select>
+        <Dropdown name="account_id" defaultValue="" options={[{ value: "", label: "Все аккаунты" }, ...accounts.map((a) => ({ value: a.id, label: "@" + a.username }))]} />
         <label>Ключевые слова (через запятую)</label>
-        <input type="text" name="keywords" placeholder="цена, сколько стоит, price" required />
+        <Input type="text" name="keywords" placeholder="цена, сколько стоит, price" required />
         <label>Действие</label>
-        <select name="action" defaultValue="reply">
-          {Object.entries(ACTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        <Dropdown name="action" defaultValue="reply" options={Object.entries(ACTIONS).map(([k, v]) => ({ value: k, label: v }))} />
         <label>Ответ в комментариях</label>
-        <textarea name="reply_text" placeholder="{username}, отправили расчёт в личные сообщения 👇" />
+        <Area name="reply_text" placeholder="{username}, отправили расчёт в личные сообщения 👇" />
         <label>Личное сообщение</label>
-        <textarea name="dm_text" placeholder="Здравствуйте! Вот расчёт стоимости…" />
+        <Area name="dm_text" placeholder="Здравствуйте! Вот расчёт стоимости…" />
         <label>Приоритет (меньше — раньше)</label>
-        <input type="text" name="priority" defaultValue="100" />
-        <label className="check">
-          <input type="checkbox" name="auto" /> Авто — отправлять без подтверждения (включайте, когда убедитесь, что правило работает верно)
-        </label>
-        <button style={{ marginTop: 12 }}>Создать правило</button>
+        <Input type="text" name="priority" defaultValue="100" />
+        <Check name="auto">Авто — отправлять без подтверждения (включайте, когда убедитесь, что правило работает верно)</Check>
+        <Button style={{ marginTop: 12 }}>Создать правило</Button>
       </form>
     </>
   );

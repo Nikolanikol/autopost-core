@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { decrypt } from "@/lib/crypto";
 import { defaultWorkspaceId, one } from "@/lib/db";
 import { listAccounts } from "@/lib/accounts";
@@ -5,19 +6,35 @@ import { publisherFor } from "@/publishers";
 import { listSlots, WEEKDAYS, workspaceTz } from "@/lib/slots";
 import { addSlotsAction, deleteSlotAction, toggleAccountAction } from "../actions";
 import { AddAccountForm } from "./AddAccountForm";
+import { Button, Check, Input } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 const STATUS: Record<string, string> = { active: "активен", needs_reauth: "нужно переподключить", disabled: "выключен" };
 
-async function quotaFor(a: any) {
+// Лимит публикаций спрашиваем у Instagram: это сетевой запрос, поэтому страница не ждёт его —
+// ячейка догружается потоком (Suspense), ответ кэшируется на 10 минут, запрос обрывается через 4 секунды.
+const quotaCache = new Map<string, { at: number; text: string }>();
+
+async function quotaText(a: any): Promise<string> {
+  const hit = quotaCache.get(a.id);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.text;
   try {
     const row = await one<{ token_enc: string }>("select token_enc from social_accounts where id=$1", [a.id]);
-    const q = await publisherFor(a.platform).quota?.(a.external_id, decrypt(row!.token_enc));
-    return q ? `${q.used} / ${q.total} за 24ч` : "—";
+    const q = await Promise.race([
+      publisherFor(a.platform).quota?.(a.external_id, decrypt(row!.token_enc)),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
+    ]);
+    const text = q ? `${q.used} / ${q.total} за 24ч` : "—";
+    quotaCache.set(a.id, { at: Date.now(), text });
+    return text;
   } catch {
     return "не удалось получить";
   }
+}
+
+async function QuotaCell({ account }: { account: any }) {
+  return <>{await quotaText(account)}</>;
 }
 
 export default async function AccountsPage() {
@@ -25,7 +42,6 @@ export default async function AccountsPage() {
   const accounts = await listAccounts(ws);
   const tz = await workspaceTz(ws);
   const slots = await Promise.all(accounts.map((a: any) => listSlots(a.id)));
-  const quotas = await Promise.all(accounts.map((a: any) => (a.status === "active" ? quotaFor(a) : "—")));
 
   return (
     <>
@@ -44,13 +60,13 @@ export default async function AccountsPage() {
                 <td>@{a.username}<div className="muted small">id {a.external_id}</div></td>
                 <td>{a.platform === "instagram" ? "Instagram" : a.platform}</td>
                 <td><span className={`chip s-${a.status}`}>{STATUS[a.status] ?? a.status}</span></td>
-                <td className="small">{quotas[i]}</td>
+                <td className="small">{a.status === "active" ? <Suspense fallback={<span className="muted">…</span>}><QuotaCell account={a} /></Suspense> : "—"}</td>
                 <td>
                   <form action={toggleAccountAction}>
                     <input type="hidden" name="account_id" value={a.id} />
-                    <button className="ghost small" style={{ padding: "2px 8px" }}>
+                    <Button className="ghost small" style={{ padding: "2px 8px" }}>
                       {a.status === "disabled" ? "Включить" : "Выключить"}
-                    </button>
+                    </Button>
                   </form>
                 </td>
               </tr>
@@ -73,19 +89,17 @@ export default async function AccountsPage() {
               <form key={s.id} action={deleteSlotAction} className="chip">
                 {WEEKDAYS[s.weekday]} {s.at_time}
                 <input type="hidden" name="slot_id" value={s.id} />
-                <button className="ghost" style={{ padding: 0, border: 0, lineHeight: 1 }} title="Удалить">×</button>
+                <Button className="ghost" style={{ padding: 0, border: 0, lineHeight: 1 }} title="Удалить">×</Button>
               </form>
             ))}
           </div>
           <form action={addSlotsAction} className="row" style={{ gap: 10 }}>
             <input type="hidden" name="account_id" value={a.id} />
             {WEEKDAYS.slice(1).map((d, wd) => (
-              <label key={d} className="check" style={{ margin: 0 }}>
-                <input type="checkbox" name="weekday" value={wd + 1} defaultChecked={wd < 5} /> {d}
-              </label>
+              <Check key={d} inline name="weekday" value={String(wd + 1)} defaultChecked={wd < 5}>{d}</Check>
             ))}
-            <input type="time" name="at_time" required defaultValue="18:00" style={{ width: 140 }} />
-            <button className="ghost">Добавить</button>
+            <Input type="time" name="at_time" required defaultValue="18:00" style={{ width: 140 }} />
+            <Button className="ghost">Добавить</Button>
           </form>
         </div>
       ))}

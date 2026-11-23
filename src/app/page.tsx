@@ -4,7 +4,9 @@ import { listPosts } from "@/lib/posts";
 import { workspaceTz } from "@/lib/slots";
 import { fmtIn, tzLabel } from "@/lib/tz";
 import { cancelPostAction, retryTargetAction } from "./actions";
+import { AccountFilter } from "./AccountFilter";
 import { AutoRefresh } from "./AutoRefresh";
+import { Button } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +23,10 @@ const STATUS: Record<string, string> = {
 };
 
 
-export default async function QueuePage() {
+export default async function QueuePage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
   const ws = await defaultWorkspaceId();
-  const posts = await listPosts(ws);
+  const account = (await searchParams).account && /^[0-9a-f-]{36}$/i.test((await searchParams).account!) ? (await searchParams).account! : null;
+  const posts = await listPosts(ws, 50, account);
   const tz = await workspaceTz(ws);
   const fmt = (d: Date | null) => fmtIn(d, tz);
   const active = posts.some((p: any) => ["scheduled", "publishing"].includes(p.status));
@@ -33,8 +36,9 @@ export default async function QueuePage() {
       <AutoRefresh active={active} />
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h1>Очередь и история</h1>
-        <Link href="/posts/new"><button>+ Новый пост</button></Link>
+        <Link href="/posts/new"><Button>+ Новый пост</Button></Link>
       </div>
+      <AccountFilter workspaceId={ws} base="/" active={account} />
       {posts.length === 0 ? (
         <div className="card muted">Постов пока нет. Создайте первый в интерфейсе или через API.</div>
       ) : (
@@ -89,7 +93,7 @@ export default async function QueuePage() {
                         {t.status === "failed" && (
                           <form action={retryTargetAction} style={{ display: "inline" }}>
                             <input type="hidden" name="target_id" value={t.id} />
-                            <button className="ghost small" style={{ padding: "2px 8px", marginTop: 4 }}>Повторить</button>
+                            <Button className="ghost small" style={{ padding: "2px 8px", marginTop: 4 }}>Повторить</Button>
                           </form>
                         )}
                       </div>
@@ -100,7 +104,7 @@ export default async function QueuePage() {
                     {p.status === "scheduled" && (
                       <form action={cancelPostAction}>
                         <input type="hidden" name="post_id" value={p.id} />
-                        <button className="danger small" style={{ padding: "2px 8px" }}>Отменить</button>
+                        <Button className="danger small" style={{ padding: "2px 8px" }}>Отменить</Button>
                       </form>
                     )}
                   </td>

@@ -3,6 +3,7 @@ import { defaultWorkspaceId, q } from "@/lib/db";
 import { workspaceTz } from "@/lib/slots";
 import { fmtIn } from "@/lib/tz";
 import { hideCommentAction, ignoreCommentAction, replyCommentAction, syncCommentsAction, unhideCommentAction } from "./actions";
+import { Area, Button, Check } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function CommentsPage({ searchParams }: { searchParams: Pro
           <Link href="/comments/rules" className="pill">Правила автоответа</Link>
           <form action={syncCommentsAction}>
             <input type="hidden" name="account_id" value={acc.id} />
-            <button className="ghost small" style={{ padding: "4px 12px" }} title="Подтянуть комментарии, которые не дошли вебхуком">Обновить</button>
+            <Button className="ghost small" style={{ padding: "4px 12px" }} title="Подтянуть комментарии, которые не дошли вебхуком">Обновить</Button>
           </form>
         </div>
       </div>
@@ -123,21 +124,19 @@ export default async function CommentsPage({ searchParams }: { searchParams: Pro
             {open ? (
               <form action={replyCommentAction} style={{ marginTop: 10 }}>
                 <input type="hidden" name="id" value={c.id} />
-                <textarea name="reply" defaultValue={c.suggested_reply ?? ""} placeholder="Ответ в комментариях" style={{ minHeight: 64 }} />
-                <label className="check small">
-                  <input type="checkbox" name="with_dm" defaultChecked={Boolean(c.suggested_dm)} /> ещё отправить личное сообщение (одно, в течение 7 дней)
-                </label>
-                <textarea name="dm" defaultValue={c.suggested_dm ?? ""} placeholder="Текст личного сообщения" style={{ minHeight: 56 }} />
+                <Area name="reply" defaultValue={c.suggested_reply ?? ""} placeholder="Ответ в комментариях" style={{ minHeight: 64 }} />
+                <Check name="with_dm" defaultChecked={Boolean(c.suggested_dm)}>ещё отправить личное сообщение (одно, в течение 7 дней)</Check>
+                <Area name="dm" defaultValue={c.suggested_dm ?? ""} placeholder="Текст личного сообщения" style={{ minHeight: 56 }} />
                 <div className="row" style={{ gap: 8, marginTop: 8 }}>
-                  <button>Отправить</button>
-                  <button className="ghost" formAction={hideCommentAction}>Скрыть</button>
-                  <button className="ghost" formAction={ignoreCommentAction}>Пропустить</button>
+                  <Button>Отправить</Button>
+                  <Button className="ghost" formAction={hideCommentAction}>Скрыть</Button>
+                  <Button className="ghost" formAction={ignoreCommentAction}>Пропустить</Button>
                 </div>
               </form>
             ) : c.hidden ? (
               <form action={unhideCommentAction} style={{ marginTop: 8 }}>
                 <input type="hidden" name="id" value={c.id} />
-                <button className="ghost small" style={{ padding: "4px 10px" }}>Показать снова</button>
+                <Button className="ghost small" style={{ padding: "4px 10px" }}>Показать снова</Button>
               </form>
             ) : null}
           </div>

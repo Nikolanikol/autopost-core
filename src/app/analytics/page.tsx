@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { defaultWorkspaceId, one, q } from "@/lib/db";
 import { refreshAnalyticsAction } from "./actions";
+import { Button } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -193,7 +194,7 @@ export default async function AnalyticsPage({
           <span className="muted small hide-sm">
             {lastSync?.t ? `Обновлено: ${new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(lastSync.t)}` : "Данных ещё нет"}
           </span>
-          <button className="ghost small" style={{ padding: "4px 12px" }}>Обновить</button>
+          <Button className="ghost small" style={{ padding: "4px 12px" }}>Обновить</Button>
         </form>
       </div>
 
