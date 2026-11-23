@@ -1,10 +1,11 @@
 import { defaultWorkspaceId, q } from "@/lib/db";
 import { createBrandAction, deleteBrandAction, moveAccountAction, renameBrandAction, switchBrandAction } from "./actions";
-import { Button, Dropdown, Input } from "@/components/ui";
+import { Button, Check, Dropdown, Input } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-export default async function BrandsPage() {
+export default async function BrandsPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+  const sp = await searchParams;
   const current = await defaultWorkspaceId();
   const brands = await q<any>(
     `select w.id, w.name, w.timezone,
@@ -15,7 +16,7 @@ export default async function BrandsPage() {
   );
   const accounts = await q<any>(
     `select a.id, a.workspace_id, a.platform, a.username, a.status,
-            exists (select 1 from post_targets t where t.account_id = a.id) as has_posts
+            (select count(distinct t.post_id) from post_targets t where t.account_id = a.id)::int as posts
        from social_accounts a order by a.platform, a.username`
   );
 
@@ -25,7 +26,11 @@ export default async function BrandsPage() {
       <p className="muted small">
         Бренд — это отдельное пространство: свои аккаунты, очередь и календарь, медиатека, шаблоны, правила комментариев,
         аналитика и API-ключи. Переключайтесь в шапке; всё, что вы видите на других страницах, относится к выбранному бренду.
+        При переносе аккаунта вместе с ним переезжают его посты и использованные в них файлы; отметка «медиатека и ключи» переносит ещё и всю
+        медиатеку и API-ключи старого бренда (нужна, когда старый бренд остаётся пустым).
       </p>
+      {sp.ok && <div className="alert ok">{sp.ok}</div>}
+      {sp.err && <div className="alert bad">{sp.err}</div>}
 
       {brands.map((b: any) => {
         const mine = accounts.filter((a: any) => a.workspace_id === b.id);
@@ -65,18 +70,17 @@ export default async function BrandsPage() {
                 <div>
                   {a.platform === "instagram" ? "Instagram" : a.platform} · <b>@{a.username}</b>
                   <span className={`chip s-${a.status}`} style={{ marginLeft: 8 }}>{a.status === "active" ? "активен" : a.status}</span>
+                  <span className="muted small" style={{ marginLeft: 8 }}>постов: {a.posts}</span>
                 </div>
-                {brands.length > 1 &&
-                  (a.has_posts ? (
-                    <span className="muted small" title="У аккаунта есть публикации — они принадлежат бренду">перенос недоступен: есть посты</span>
-                  ) : (
-                    <form action={moveAccountAction} className="row" style={{ gap: 6 }}>
-                      <input type="hidden" name="account_id" value={a.id} />
-                      <Dropdown name="brand" defaultValue={b.id} width="auto" size="1" ariaLabel="Перенести в бренд"
-                        options={brands.map((x: any) => ({ value: x.id, label: x.name }))} />
-                      <Button className="ghost small" style={{ padding: "4px 10px" }}>Перенести</Button>
-                    </form>
-                  ))}
+                {brands.length > 1 && (
+                  <form action={moveAccountAction} className="row" style={{ gap: 8 }}>
+                    <input type="hidden" name="account_id" value={a.id} />
+                    <Dropdown name="brand" defaultValue={b.id} width="auto" size="1" ariaLabel="Перенести в бренд"
+                      options={brands.map((x: any) => ({ value: x.id, label: x.name }))} />
+                    <Check inline name="with_library">+ медиатека и ключи бренда</Check>
+                    <Button className="ghost small">Перенести</Button>
+                  </form>
+                )}
               </div>
             ))}
           </div>

@@ -183,12 +183,21 @@ export async function listPostsBetween(workspaceId: string, from: Date, to: Date
   );
 }
 
-export async function listPosts(workspaceId: string, limit = 50, accountId?: string | null) {
+export async function countPosts(workspaceId: string, accountId?: string | null) {
+  const r = await one<{ n: string }>(
+    `select count(*) as n from posts p where p.workspace_id=$1
+        and ($2::uuid is null or exists (select 1 from post_targets f where f.post_id = p.id and f.account_id = $2))`,
+    [workspaceId, accountId ?? null]
+  );
+  return Number(r?.n ?? 0);
+}
+
+export async function listPosts(workspaceId: string, limit = 50, accountId?: string | null, offset = 0) {
   const posts = await q(
     `select * from posts p where p.workspace_id=$1
         and ($3::uuid is null or exists (select 1 from post_targets f where f.post_id = p.id and f.account_id = $3))
-      order by coalesce(p.scheduled_at, p.created_at) desc limit $2`,
-    [workspaceId, limit, accountId ?? null]
+      order by coalesce(p.scheduled_at, p.created_at) desc limit $2 offset $4`,
+    [workspaceId, limit, accountId ?? null, offset]
   );
   if (posts.length === 0) return [];
   const targets = await q(

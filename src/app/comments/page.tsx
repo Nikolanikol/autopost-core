@@ -2,6 +2,7 @@ import Link from "next/link";
 import { defaultWorkspaceId, q } from "@/lib/db";
 import { workspaceTz } from "@/lib/slots";
 import { fmtIn } from "@/lib/tz";
+import { PAGE_SIZE, Pager, pageFrom } from "../Pager";
 import { hideCommentAction, ignoreCommentAction, replyCommentAction, syncCommentsAction, unhideCommentAction } from "./actions";
 import { Area, Button, Check } from "@/components/ui";
 
@@ -21,7 +22,7 @@ const TABS: Record<string, { label: string; sql: string }> = {
 };
 const ACTION_LABEL: Record<string, string> = { reply: "ответ", reply_dm: "ответ + личное сообщение", dm: "личное сообщение", hide: "скрыть" };
 
-export default async function CommentsPage({ searchParams }: { searchParams: Promise<{ account?: string; t?: string }> }) {
+export default async function CommentsPage({ searchParams }: { searchParams: Promise<{ account?: string; t?: string; p?: string }> }) {
   const sp = await searchParams;
   const ws = await defaultWorkspaceId();
   const tz = await workspaceTz(ws);
@@ -47,12 +48,14 @@ export default async function CommentsPage({ searchParams }: { searchParams: Pro
   const cnt = (...st: string[]) => counts.filter((c) => st.includes(c.status)).reduce((s, c) => s + Number(c.n), 0);
   const tabCount: Record<string, number> = { new: cnt("new", "failed"), done: cnt("replied", "hidden"), all: cnt("new", "failed", "replied", "hidden") };
 
+  const totalRows = tabCount[tab];
+  const pg = pageFrom(sp.p, totalRows);
   const rows = await q<any>(
     `select c.*, r.name as rule_name, r.action as rule_action, r.auto as rule_auto
        from ig_comments c left join comment_rules r on r.id = c.matched_rule_id
       where c.account_id=$1 and c.parent_id is null and c.status <> 'ignored' and (${TABS[tab].sql})
-      order by c.commented_at desc nulls last limit 100`,
-    [acc.id]
+      order by c.commented_at desc nulls last limit ${PAGE_SIZE} offset $2`,
+    [acc.id, pg.offset]
   );
 
   return (
@@ -142,6 +145,7 @@ export default async function CommentsPage({ searchParams }: { searchParams: Pro
           </div>
         );
       })}
+      <Pager page={pg.page} pages={pg.pages} total={totalRows} href={(n) => href({ p: String(n) })} />
     </>
   );
 }

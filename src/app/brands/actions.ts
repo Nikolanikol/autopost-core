@@ -2,6 +2,8 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { MoveError, moveAccountToBrand } from "@/lib/brands";
 import { BRAND_COOKIE, defaultWorkspaceId, one, q } from "@/lib/db";
 
 const clean = (v: FormDataEntryValue | null) => String(v ?? "").trim();
@@ -57,21 +59,19 @@ export async function deleteBrandAction(fd: FormData) {
   refresh();
 }
 
-/**
- * Перенос аккаунта в другой бренд. Возможен, пока у аккаунта нет публикаций (у постов бренд свой).
- * Правила автоответа аккаунта переезжают вместе с ним.
- */
+/** Перенос аккаунта в другой бренд вместе с постами и файлами (см. moveAccountToBrand). */
 export async function moveAccountAction(fd: FormData) {
-  const accountId = clean(fd.get("account_id"));
-  const to = clean(fd.get("brand"));
-  const acc = await one<{ workspace_id: string; platform: string; external_id: string }>(
-    "select workspace_id, platform, external_id from social_accounts where id=$1",
-    [accountId]
-  );
-  if (!acc || acc.workspace_id === to || !(await one("select 1 from workspaces where id=$1", [to]))) return;
-  if (await one("select 1 from post_targets where account_id=$1 limit 1", [accountId])) return;
-  if (await one("select 1 from social_accounts where workspace_id=$1 and platform=$2 and external_id=$3", [to, acc.platform, acc.external_id])) return;
-  await q("update social_accounts set workspace_id=$2, updated_at=now() where id=$1", [accountId, to]);
-  await q("update comment_rules set workspace_id=$2 where account_id=$1", [accountId, to]);
+  let notice: string;
+  try {
+    const r = await moveAccountToBrand(clean(fd.get("account_id")), clean(fd.get("brand")), fd.get("with_library") === "on");
+    const parts = [`постов: ${r.posts}`];
+    if (r.media_moved + r.media_copied) parts.push(`файлов из постов: ${r.media_moved + r.media_copied}`);
+    if (r.library_files) parts.push(`файлов медиатеки: ${r.library_files}`);
+    if (r.keys) parts.push(`API-ключей: ${r.keys}`);
+    notice = `ok=${encodeURIComponent("Аккаунт перенесён. Переехало: " + parts.join(", "))}`;
+  } catch (e) {
+    notice = `err=${encodeURIComponent(e instanceof MoveError ? e.message : "Не удалось перенести: " + (e as Error).message)}`;
+  }
   refresh();
+  redirect(`/brands?${notice}`);
 }

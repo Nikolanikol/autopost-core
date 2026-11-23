@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { defaultWorkspaceId, one, q } from "@/lib/db";
+import { PAGE_SIZE, Pager, pageFrom } from "../Pager";
 import { refreshAnalyticsAction } from "./actions";
 import { Button } from "@/components/ui";
 
@@ -88,7 +89,7 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ account?: string; d?: string; s?: string; t?: string }>;
+  searchParams: Promise<{ account?: string; d?: string; s?: string; t?: string; p?: string }>;
 }) {
   const sp = await searchParams;
   const ws = await defaultWorkspaceId();
@@ -167,12 +168,16 @@ export default async function AnalyticsPage({
     [acc.id]
   );
 
+  const totalMedia = Number(
+    (await one<{ n: string }>(`select count(*) as n from account_media where account_id=$1 and ${TYPES[typeKey].sql}`, [acc.id]))?.n ?? 0
+  );
+  const pg = pageFrom(sp.p, totalMedia);
   const media = await q<any>(
     `select external_id, product_type, media_type, caption, permalink, thumbnail_url, posted_at,
             likes, comments, saves, shares, reach, views, total_interactions, avg_watch_ms, metrics_at
        from account_media where account_id=$1 and ${TYPES[typeKey].sql}
-      order by ${SORTS[sortKey].sql} limit 100`,
-    [acc.id]
+      order by ${SORTS[sortKey].sql} limit ${PAGE_SIZE} offset $2`,
+    [acc.id, pg.offset]
   );
   const lastSync = await one<{ t: Date | null }>("select max(metrics_at) as t from account_media where account_id=$1", [acc.id]);
   const demo = await q<{ breakdown: string; data: { key: string; value: number }[] }>(
@@ -373,6 +378,7 @@ export default async function AnalyticsPage({
               </tbody>
             </table>
           </div>
+          <Pager page={pg.page} pages={pg.pages} total={totalMedia} href={(n) => href({ p: n })} />
 
           <h2>Аудитория</h2>
           {demo.length === 0 ? (

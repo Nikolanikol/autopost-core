@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { defaultWorkspaceId } from "@/lib/db";
-import { listPosts } from "@/lib/posts";
+import { countPosts, listPosts } from "@/lib/posts";
 import { workspaceTz } from "@/lib/slots";
 import { fmtIn, tzLabel } from "@/lib/tz";
 import { cancelPostAction, retryTargetAction } from "./actions";
 import { AccountFilter } from "./AccountFilter";
+import { Pager, pageFrom } from "./Pager";
 import { AutoRefresh } from "./AutoRefresh";
 import { Button } from "@/components/ui";
 
@@ -23,10 +24,12 @@ const STATUS: Record<string, string> = {
 };
 
 
-export default async function QueuePage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
+export default async function QueuePage({ searchParams }: { searchParams: Promise<{ account?: string; p?: string }> }) {
   const ws = await defaultWorkspaceId();
   const account = (await searchParams).account && /^[0-9a-f-]{36}$/i.test((await searchParams).account!) ? (await searchParams).account! : null;
-  const posts = await listPosts(ws, 50, account);
+  const total = await countPosts(ws, account);
+  const pg = pageFrom((await searchParams).p, total, 25);
+  const posts = await listPosts(ws, 25, account, pg.offset);
   const tz = await workspaceTz(ws);
   const fmt = (d: Date | null) => fmtIn(d, tz);
   const active = posts.some((p: any) => ["scheduled", "publishing"].includes(p.status));
@@ -114,6 +117,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
           </table>
         </div>
       )}
+      <Pager page={pg.page} pages={pg.pages} total={total} size={25} href={(n) => `/?${new URLSearchParams({ ...(account ? { account } : {}), p: String(n) })}`} />
     </>
   );
 }
