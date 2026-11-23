@@ -4,7 +4,8 @@ import { decrypt } from "@/lib/crypto";
 import { one, pool, q } from "@/lib/db";
 import { getBoss, enqueueTarget, PUBLISH_QUEUE, type PublishJob } from "@/lib/queue";
 import { refreshPostStatus } from "@/lib/posts";
-import { emit } from "@/lib/notify";
+import { emit, notifyDraft } from "@/lib/notify";
+import { tiktokAccessToken } from "@/lib/tiktokAuth";
 import { collectMetrics } from "@/lib/metrics";
 import { syncComments } from "@/lib/comments";
 import { publisherFor, PlatformError, type MediaItem, type PublishContext } from "@/publishers";
@@ -72,6 +73,9 @@ async function handle(job: PublishJob, retryCount: number, retryLimit: number) {
   }
 
   try {
+    // TikTok: access-токен живёт сутки — берём действующий (при необходимости обновляем).
+    if (t.platform === "tiktok") ctx.account.token = await tiktokAccessToken(t.account_id);
+
     if (!ctx.containerId) {
       const { containerId } = await pub.start(ctx);
       ctx.containerId = containerId;
@@ -111,7 +115,12 @@ async function handle(job: PublishJob, retryCount: number, retryLimit: number) {
     });
     await log(t.id, "finish", true, { externalId, permalink });
     console.log(`✅ ${t.platform} @${t.username}: ${permalink ?? externalId}`);
-    await emit(t.workspace_id, "post.published", { ...ev, external_id: externalId, permalink });
+    if (pub.draftOnly) {
+      // Видео лежит в черновиках приложения — подпись отправляем в Telegram, чтобы вставить при публикации.
+      await notifyDraft(t.workspace_id, { ...ev, caption: ctx.caption });
+    } else {
+      await emit(t.workspace_id, "post.published", { ...ev, external_id: externalId, permalink });
+    }
 
     // Первый комментарий: после публикации, с повторами. Неудача не отменяет публикацию — пишем причину в карточку цели.
     const fc = typeof ctx.options.first_comment === "string" ? ctx.options.first_comment.trim() : "";

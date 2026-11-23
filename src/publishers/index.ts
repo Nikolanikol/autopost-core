@@ -1,7 +1,8 @@
 import { instagram } from "./instagram";
+import { tiktok } from "./tiktok";
 import type { Platform, Publisher } from "./types";
 
-const registry: Partial<Record<Platform, Publisher>> = { instagram };
+const registry: Partial<Record<Platform, Publisher>> = { instagram, tiktok };
 
 export function publisherFor(platform: string): Publisher {
   const p = registry[platform as Platform];

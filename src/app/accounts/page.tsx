@@ -7,6 +7,7 @@ import { listSlots, WEEKDAYS, workspaceTz } from "@/lib/slots";
 import { addSlotsAction, deleteSlotAction, toggleAccountAction } from "../actions";
 import { AddAccountForm } from "./AddAccountForm";
 import { Button, Check, Input } from "@/components/ui";
+import { tiktokConfigured, tiktokRedirectUri } from "@/lib/tiktokAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,8 @@ async function QuotaCell({ account }: { account: any }) {
   return <>{await quotaText(account)}</>;
 }
 
-export default async function AccountsPage() {
+export default async function AccountsPage({ searchParams }: { searchParams: Promise<{ tiktok_ok?: string; tiktok_error?: string }> }) {
+  const sp = await searchParams;
   const ws = await defaultWorkspaceId();
   const accounts = await listAccounts(ws);
   const tz = await workspaceTz(ws);
@@ -58,7 +60,7 @@ export default async function AccountsPage() {
             {accounts.map((a: any, i: number) => (
               <tr key={a.id}>
                 <td>@{a.username}<div className="muted small">id {a.external_id}</div></td>
-                <td>{a.platform === "instagram" ? "Instagram" : a.platform}</td>
+                <td>{a.platform === "instagram" ? "Instagram" : a.platform === "tiktok" ? "TikTok (черновики)" : a.platform}</td>
                 <td><span className={`chip s-${a.status}`}>{STATUS[a.status] ?? a.status}</span></td>
                 <td className="small">{a.status === "active" ? <Suspense fallback={<span className="muted">…</span>}><QuotaCell account={a} /></Suspense> : "—"}</td>
                 <td>
@@ -105,6 +107,27 @@ export default async function AccountsPage() {
       ))}
 
       <h2>Подключить аккаунт</h2>
+      <h3>TikTok</h3>
+      <div className="card">
+        {sp.tiktok_ok !== undefined && <div className="alert ok">Подключён TikTok @{sp.tiktok_ok}</div>}
+        {sp.tiktok_error && <div className="alert bad">TikTok: {sp.tiktok_error}</div>}
+        {tiktokConfigured() ? (
+          <>
+            <div className="muted small">
+              Видео загружается в черновики приложения TikTok, публикуете вы сами. Redirect URI в кабинете TikTok:{" "}
+              <code>{tiktokRedirectUri()}</code>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <a href="/api/oauth/tiktok/start"><Button type="button">Подключить TikTok</Button></a>
+            </div>
+          </>
+        ) : (
+          <div className="muted small">
+            Задайте <code>TIKTOK_CLIENT_KEY</code> и <code>TIKTOK_CLIENT_SECRET</code> в .env (инструкция — docs/TIKTOK.md).
+          </div>
+        )}
+      </div>
+      <h3>Instagram</h3>
       <AddAccountForm />
     </>
   );

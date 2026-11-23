@@ -79,7 +79,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                     {p.targets.map((t: any) => (
                       <div key={t.id} style={{ marginBottom: 6 }}>
                         <span className={`chip s-${t.status}`}>
-                          {t.platform === "instagram" ? "IG" : t.platform} @{t.username} · {STATUS[t.status] ?? t.status}
+                          {t.platform === "instagram" ? "IG" : t.platform === "tiktok" ? "TikTok" : t.platform} @{t.username} · {t.platform === "tiktok" && t.status === "published" ? "в черновиках" : (STATUS[t.status] ?? t.status)}
                         </span>
                         {t.options?.ai_generated === true && <span className="chip" style={{ marginLeft: 6 }} title="Метка «создано ИИ»">ИИ</span>}
                         {t.options?.first_comment && <span className="chip" style={{ marginLeft: 6 }} title={String(t.options.first_comment)}>💬 1-й коммент</span>}

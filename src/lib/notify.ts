@@ -32,10 +32,22 @@ export async function sendTelegram(tokenEnc: string, chatId: string, text: strin
   if (!data.ok) throw new Error(data.description ?? `Telegram HTTP ${res.status}`);
 }
 
+/** Видео загружено в черновики платформы (TikTok): всегда пишем в Telegram, если он настроен, с текстом подписи. */
+export async function notifyDraft(workspaceId: string, p: Record<string, any>) {
+  const tg = await getTelegram(workspaceId);
+  if (!tg.bot_token_enc || !tg.chat_id) return;
+  const text =
+    `📥 Видео в черновиках TikTok @${esc(String(p.username ?? ""))}\nОткройте TikTok → Профиль → Черновики (или «Входящие»), вставьте подпись и опубликуйте.` +
+    (p.caption ? `\n\nПодпись:\n<code>${esc(String(p.caption))}</code>` : "");
+  await sendTelegram(tg.bot_token_enc, tg.chat_id, text).catch((e) => console.error("[notify draft]", e?.message ?? e));
+}
+
+const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", tiktok: "TikTok" };
+
 const esc = (s: string) => s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c]!);
 
 function telegramText(event: EventName, p: Record<string, any>) {
-  const who = `${p.platform === "instagram" ? "Instagram" : p.platform} @${p.username}`;
+  const who = `${PLATFORM_LABEL[p.platform] ?? p.platform} @${p.username}`;
   if (event === "post.published") return `✅ Опубликовано: ${esc(who)}${p.permalink ? `\n${p.permalink}` : ""}`;
   if (event === "post.failed") return `❌ Ошибка публикации: ${esc(who)}\n${esc(String(p.error ?? ""))}`;
   return `⚠️ Нужно переподключить аккаунт ${esc(who)}\n${esc(String(p.error ?? ""))}`;

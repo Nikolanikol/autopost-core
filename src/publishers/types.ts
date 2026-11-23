@@ -7,6 +7,8 @@ export interface MediaItem {
   width?: number | null;
   height?: number | null;
   duration_sec?: number | null;
+  mime?: string | null;
+  storage_key?: string | null;
 }
 
 export interface PublishContext {
@@ -33,6 +35,8 @@ export interface Issue {
 /** Контракт провайдера платформы (идея из Postiz/TryPost). */
 export interface Publisher {
   platform: Platform;
+  /** Платформа принимает только черновики: окончательно публикует человек в приложении (TikTok). */
+  draftOnly?: boolean;
   validate(media: MediaItem[], options: Record<string, unknown>): Issue[];
   /** Фаза 1: загрузить медиа / создать контейнер. */
   start(ctx: PublishContext): Promise<{ containerId: string | null }>;

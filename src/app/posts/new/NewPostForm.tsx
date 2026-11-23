@@ -125,7 +125,7 @@ export function NewPostForm({ accounts, media, templates }: { accounts: Account[
             checked={selected.includes(a.id)}
             onCheckedChange={(on) => setSelected((s) => (on ? [...s, a.id] : s.filter((x) => x !== a.id)))}
           >
-            {a.platform === "instagram" ? "Instagram" : a.platform} · @{a.username}
+            {a.platform === "instagram" ? "Instagram" : a.platform === "tiktok" ? "TikTok (в черновики)" : a.platform} · @{a.username}
           </Check>
         ))}
 
