@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/calendar">Календарь</Link>
               <Link href="/posts/new">Новый пост</Link>
               <Link href="/media">Медиатека</Link>
+              <Link href="/analytics">Аналитика</Link>
               <Link href="/accounts">Аккаунты</Link>
               <Link href="/settings">Настройки</Link>
             </nav>

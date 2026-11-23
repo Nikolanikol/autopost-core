@@ -105,3 +105,17 @@ code.secret { display: block; padding: 10px; background: var(--chip); border-rad
 .tabs { display: flex; gap: 4px; margin: 6px 0 10px; flex-wrap: wrap; }
 .tabs button { padding: 4px 10px; }
 .slots { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+
+/* Аналитика */
+.pill { padding: 3px 12px; border-radius: 999px; background: var(--chip); color: var(--muted); font-size: 13px; white-space: nowrap; }
+.pill:hover { color: var(--text); }
+.pill.on { background: var(--accent); color: #fff; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.kpi-v { font-size: 24px; font-weight: 700; line-height: 1.2; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 8px; }
+.charts .card { margin-bottom: 0; }
+.chart svg { margin-top: 8px; display: block; }
+.bar-row { display: grid; grid-template-columns: 1fr 90px 36px; gap: 8px; align-items: center; margin-top: 8px; }
+.bar { height: 8px; border-radius: 4px; background: var(--chip); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); }

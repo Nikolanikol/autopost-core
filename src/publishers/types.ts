@@ -46,6 +46,80 @@ export interface Publisher {
   /** Метрики опубликованного поста. Ошибки прав не должны ронять аккаунт — только помечаются в notes. */
   postMetrics?(mediaId: string, token: string): Promise<PostMetrics>;
   accountMetrics?(externalId: string, token: string): Promise<AccountMetrics>;
+  /** Аналитика аккаунта целиком (все публикации, дневные итоги, демография). */
+  listMedia?(externalId: string, token: string, limit: number): Promise<MediaListItem[]>;
+  mediaInsights?(mediaId: string, productType: string | null, token: string): Promise<MediaInsight>;
+  dailyInsights?(externalId: string, token: string, dayStartUtc: Date): Promise<DailyInsight>;
+  demographics?(externalId: string, token: string): Promise<DemographicsResult>;
+  /** Подписчики онлайн по часам, по дням (за последние ~28 дней). */
+  onlineFollowers?(externalId: string, token: string): Promise<OnlineDay[]>;
+  /** Чужие публикации, где отмечен наш аккаунт. */
+  listTags?(externalId: string, token: string): Promise<TaggedMedia[]>;
+}
+
+export interface OnlineDay {
+  day: string; // YYYY-MM-DD
+  hours: Record<string, number>; // "0".."23" → подписчиков онлайн
+}
+
+export interface TaggedMedia {
+  external_id: string;
+  username: string | null;
+  caption: string | null;
+  permalink: string | null;
+  media_url: string | null;
+  posted_at: string | null;
+  like_count: number | null;
+  comments_count: number | null;
+}
+
+export interface MediaListItem {
+  external_id: string;
+  product_type: string | null;
+  media_type: string | null;
+  caption: string | null;
+  permalink: string | null;
+  thumbnail_url: string | null;
+  posted_at: string | null;
+  likes: number | null;
+  comments: number | null;
+}
+
+export interface MediaInsight {
+  reach?: number | null;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  saves?: number | null;
+  total_interactions?: number | null;
+  avg_watch_ms?: number | null;
+  total_watch_ms?: number | null;
+  notes: string[];
+}
+
+export interface DailyInsight {
+  reach?: number | null;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  saves?: number | null;
+  total_interactions?: number | null;
+  profile_views?: number | null;
+  accounts_engaged?: number | null;
+  follows_delta?: number | null;
+  follows?: number | null;
+  unfollows?: number | null;
+  link_taps_total?: number | null;
+  link_taps?: Record<string, number> | null;
+  notes: string[];
+}
+
+export interface DemographicsResult {
+  /** breakdown (country/city/age/gender) → отсортированный список { key, value }. */
+  data: Record<string, { key: string; value: number }[]>;
+  notes: string[];
 }
 
 export interface PostMetrics {

@@ -5,6 +5,7 @@ import {
   type ErrorClass,
   type Issue,
   type MediaItem,
+  type MediaListItem,
   type PostMetrics,
   type PublishContext,
   type Publisher,
@@ -180,6 +181,148 @@ export const instagram: Publisher = {
     out.views_day = ins.views ?? null;
     return out;
   },
+
+  /** Все публикации аккаунта (лента и Reels), новые первыми. Истории сюда не попадают. */
+  async listMedia(externalId, token, limit) {
+    const items: MediaListItem[] = [];
+    let after: string | undefined;
+    while (items.length < limit) {
+      const r = await api<{
+        data: any[];
+        paging?: { cursors?: { after?: string }; next?: string };
+      }>(token, "GET", `${externalId}/media`, {
+        fields: "id,media_product_type,media_type,caption,permalink,timestamp,thumbnail_url,media_url,like_count,comments_count",
+        limit: "50",
+        ...(after ? { after } : {}),
+      });
+      for (const m of r.data ?? []) {
+        items.push({
+          external_id: m.id,
+          product_type: m.media_product_type ?? null,
+          media_type: m.media_type ?? null,
+          caption: m.caption ?? null,
+          permalink: m.permalink ?? null,
+          thumbnail_url: m.thumbnail_url ?? (m.media_type === "IMAGE" ? m.media_url : null) ?? null,
+          posted_at: m.timestamp ?? null,
+          likes: m.like_count ?? null,
+          comments: m.comments_count ?? null,
+        });
+      }
+      after = r.paging?.next ? r.paging.cursors?.after : undefined;
+      if (!after || !r.data?.length) break;
+    }
+    return items.slice(0, limit);
+  },
+
+  async mediaInsights(mediaId, productType, token) {
+    const notes: string[] = [];
+    const reel = productType === "REELS";
+    const metrics = ["reach", "views", "likes", "comments", "shares", "saved", "total_interactions"];
+    if (reel) metrics.push("ig_reels_avg_watch_time", "ig_reels_video_view_total_time");
+    const ins = await insights(token, `${mediaId}/insights`, metrics, {}, notes);
+    return {
+      reach: ins.reach ?? null,
+      views: ins.views ?? null,
+      likes: ins.likes ?? null,
+      comments: ins.comments ?? null,
+      shares: ins.shares ?? null,
+      saves: ins.saved ?? null,
+      total_interactions: ins.total_interactions ?? null,
+      avg_watch_ms: ins.ig_reels_avg_watch_time ?? null,
+      total_watch_ms: ins.ig_reels_video_view_total_time ?? null,
+      notes,
+    };
+  },
+
+  /** Итоги аккаунта за одни сутки (UTC): окно since…until = [день, день+24ч). */
+  async dailyInsights(externalId, token, dayStartUtc) {
+    const notes: string[] = [];
+    const since = Math.floor(dayStartUtc.getTime() / 1000);
+    const ins = await insights(
+      token,
+      `${externalId}/insights`,
+      ["reach", "views", "likes", "comments", "shares", "saves", "total_interactions", "profile_views", "accounts_engaged"],
+      { period: "day", metric_type: "total_value", since: String(since), until: String(since + 86400) },
+      notes
+    );
+    const win = { since: String(since), until: String(since + 86400) };
+    // Подписки/отписки: FOLLOWER — подписались, NON_FOLLOWER — отписались (по данным Meta).
+    const fu = await breakdown(token, `${externalId}/insights`, "follows_and_unfollows", "follow_type", win, notes);
+    // Клики по ссылке и кнопкам профиля (звонок, SMS, письмо, маршрут …).
+    const taps = await breakdown(token, `${externalId}/insights`, "profile_links_taps", "contact_button_type", win, notes);
+    const tapsMap = Object.fromEntries(taps.results.map((r) => [r.key, r.value]));
+    return {
+      reach: ins.reach ?? null,
+      views: ins.views ?? null,
+      likes: ins.likes ?? null,
+      comments: ins.comments ?? null,
+      shares: ins.shares ?? null,
+      saves: ins.saves ?? null,
+      total_interactions: ins.total_interactions ?? null,
+      profile_views: ins.profile_views ?? null,
+      accounts_engaged: ins.accounts_engaged ?? null,
+      follows: fu.results.length || fu.total != null ? (fu.results.find((r) => r.key === "FOLLOWER")?.value ?? 0) : null,
+      unfollows: fu.results.length || fu.total != null ? (fu.results.find((r) => r.key === "NON_FOLLOWER")?.value ?? 0) : null,
+      link_taps_total: taps.total ?? taps.results.reduce((a, r) => a + r.value, 0),
+      link_taps: tapsMap,
+      notes,
+    };
+  },
+
+  /** Когда подписчики онлайн: часы 0–23 по каждому дню за последние 28 дней. */
+  async onlineFollowers(externalId, token) {
+    const until = Math.floor(Date.now() / 86400e3) * 86400;
+    const r = await api<{ data: { values?: { value: Record<string, number>; end_time: string }[] }[] }>(
+      token,
+      "GET",
+      `${externalId}/insights`,
+      { metric: "online_followers", period: "lifetime", since: String(until - 28 * 86400), until: String(until) }
+    );
+    return (r.data?.[0]?.values ?? [])
+      .filter((v) => v.value && Object.keys(v.value).length > 0)
+      .map((v) => ({ day: new Date(new Date(v.end_time).getTime() - 86400e3).toISOString().slice(0, 10), hours: v.value }));
+  },
+
+  /** Чужие публикации с отметкой нашего аккаунта. */
+  async listTags(externalId, token) {
+    const r = await api<{ data: any[] }>(token, "GET", `${externalId}/tags`, {
+      fields: "id,username,caption,permalink,media_url,timestamp,like_count,comments_count",
+      limit: "50",
+    });
+    return (r.data ?? []).map((m) => ({
+      external_id: m.id,
+      username: m.username ?? null,
+      caption: m.caption ?? null,
+      permalink: m.permalink ?? null,
+      media_url: m.media_url ?? null,
+      posted_at: m.timestamp ?? null,
+      like_count: m.like_count ?? null,
+      comments_count: m.comments_count ?? null,
+    }));
+  },
+
+  /** Демография подписчиков. Instagram отдаёт её только от 100 подписчиков. */
+  async demographics(externalId, token) {
+    const data: Record<string, { key: string; value: number }[]> = {};
+    const notes: string[] = [];
+    for (const breakdown of ["country", "city", "age", "gender"]) {
+      try {
+        const r = await api<{ data: { total_value?: { breakdowns?: { results?: { dimension_values: string[]; value: number }[] }[] } }[] }>(
+          token,
+          "GET",
+          `${externalId}/insights`,
+          { metric: "follower_demographics", period: "lifetime", metric_type: "total_value", breakdown }
+        );
+        const results = r.data?.[0]?.total_value?.breakdowns?.[0]?.results ?? [];
+        data[breakdown] = results
+          .map((x) => ({ key: x.dimension_values.join(" / "), value: x.value }))
+          .sort((a, b) => b.value - a.value);
+      } catch (e) {
+        notes.push(`демография ${breakdown}: ${(e as Error).message}`);
+      }
+    }
+    return { data, notes };
+  },
 };
 
 /**
@@ -211,5 +354,29 @@ async function insights(
     const res: Record<string, number> = {};
     for (const m of metrics) Object.assign(res, await insights(token, path, [m], extra, notes));
     return res;
+  }
+}
+
+/** Метрика с разбивкой (breakdown): итог + строки «значение → число». Ошибки прав/параметров не роняют сбор. */
+async function breakdown(
+  token: string,
+  path: string,
+  metric: string,
+  by: string,
+  extra: Record<string, string>,
+  notes: string[]
+): Promise<{ total: number | null; results: { key: string; value: number }[] }> {
+  try {
+    const r = await api<{
+      data: { total_value?: { value?: number; breakdowns?: { results?: { dimension_values: string[]; value: number }[] }[] } }[];
+    }>(token, "GET", path, { metric, period: "day", metric_type: "total_value", breakdown: by, ...extra });
+    const tv = r.data?.[0]?.total_value;
+    return {
+      total: tv?.value ?? null,
+      results: (tv?.breakdowns?.[0]?.results ?? []).map((x) => ({ key: x.dimension_values.join("/"), value: x.value })),
+    };
+  } catch (e) {
+    notes.push(`${metric}: ${(e as Error).message}`);
+    return { total: null, results: [] };
   }
 }

@@ -3,6 +3,7 @@
 import { decrypt } from "./crypto";
 import { q } from "./db";
 import { publisherFor } from "@/publishers";
+import { syncAccountAnalytics } from "./analytics";
 
 export async function collectMetrics(log: (msg: string) => void = console.log) {
   const targets = await q(
@@ -52,6 +53,15 @@ export async function collectMetrics(log: (msg: string) => void = console.log) {
       accs++;
     } catch (e) {
       notes.add(`аккаунт ${a.external_id}: ${(e as Error).message}`);
+    }
+  }
+  // Аналитика аккаунта целиком (все публикации, дневные итоги, демография).
+  for (const a of accounts) {
+    try {
+      const r = await syncAccountAnalytics(a.id, log);
+      r.notes.forEach((n) => notes.add(n));
+    } catch (e) {
+      notes.add(`аналитика ${a.external_id}: ${(e as Error).message}`);
     }
   }
   log(`📊 метрики: постов ${posts}, аккаунтов ${accs}${notes.size ? ` | заметки: ${[...notes].slice(0, 3).join(" · ")}` : ""}`);
