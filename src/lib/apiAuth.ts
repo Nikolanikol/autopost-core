@@ -18,6 +18,27 @@ export async function requireApiKey(req: Request): Promise<string> {
   return row.workspace_id;
 }
 
+export interface ApiKeyContext {
+  keyId: string;
+  keyName: string;
+  workspaceId: string;
+  scope: "brand" | "all";
+}
+
+/** Как requireApiKey, но возвращает ещё и область ключа (для MCP: ключ «all» видит все бренды). */
+export async function requireApiKeyContext(req: Request): Promise<ApiKeyContext> {
+  const h = req.headers.get("authorization") ?? "";
+  const secret = h.startsWith("Bearer ") ? h.slice(7).trim() : "";
+  if (!secret) throw new HttpError(401, "Нужен заголовок Authorization: Bearer <api key>");
+  const row = await one<{ id: string; name: string; workspace_id: string; scope: "brand" | "all" }>(
+    "select id, name, workspace_id, scope from api_keys where key_hash=$1 and revoked_at is null",
+    [sha256(secret)]
+  );
+  if (!row) throw new HttpError(401, "Неверный или отозванный API-ключ");
+  q("update api_keys set last_used_at=now() where id=$1", [row.id]).catch(() => {});
+  return { keyId: row.id, keyName: row.name, workspaceId: row.workspace_id, scope: row.scope };
+}
+
 export class HttpError extends Error {
   constructor(public status: number, message: string, public details?: unknown) {
     super(message);

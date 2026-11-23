@@ -17,4 +17,4 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-export const config = { matcher: ["/((?!api/v1|api/webhooks/|media/|_next/static|_next/image|favicon.ico).*)"] };
+export const config = { matcher: ["/((?!api/v1|api/mcp|api/webhooks/|media/|_next/static|_next/image|favicon.ico).*)"] };

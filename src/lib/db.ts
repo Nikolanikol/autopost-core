@@ -32,8 +32,25 @@ export async function tx<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   }
 }
 
-/** MVP: один workspace. На этапе 3 сюда придёт выбор из сессии / API-ключа. */
+export const BRAND_COOKIE = "ap_brand";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Текущий бренд (workspace): из cookie выбранного в шапке бренда; если cookie нет или бренд удалён — первый.
+ * Вне веб-запроса (worker, скрипты) cookie недоступны — берётся первый workspace.
+ * Имя функции оставлено прежним, чтобы не менять все страницы.
+ */
 export async function defaultWorkspaceId(): Promise<string> {
+  try {
+    const { cookies } = await import("next/headers");
+    const id = (await cookies()).get(BRAND_COOKIE)?.value;
+    if (id && UUID.test(id)) {
+      const row = await one<{ id: string }>("select id from workspaces where id=$1", [id]);
+      if (row) return row.id;
+    }
+  } catch {
+    // нет контекста запроса — используем значение по умолчанию
+  }
   const row = await one<{ id: string }>("select id from workspaces order by created_at limit 1");
   if (!row) throw new Error("Нет workspace — запустите миграции");
   return row.id;

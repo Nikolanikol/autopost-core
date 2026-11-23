@@ -119,3 +119,6 @@ code.secret { display: block; padding: 10px; background: var(--chip); border-rad
 .bar-row { display: grid; grid-template-columns: 1fr 90px 36px; gap: 8px; align-items: center; margin-top: 8px; }
 .bar { height: 8px; border-radius: 4px; background: var(--chip); overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--accent); }
+
+/* Переключатель брендов */
+.brand-select { width: auto; max-width: 180px; padding: 4px 8px; font-weight: 600; border-radius: 8px; cursor: pointer; }

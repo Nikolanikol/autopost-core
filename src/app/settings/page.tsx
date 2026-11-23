@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const ws = await defaultWorkspaceId();
   const [keys, templates, hooks, tg, tz] = await Promise.all([
-    q("select id, name, prefix, created_at, last_used_at, revoked_at from api_keys where workspace_id=$1 order by created_at desc", [ws]),
+    q("select id, name, prefix, scope, created_at, last_used_at, revoked_at from api_keys where workspace_id=$1 or scope='all' order by created_at desc", [ws]),
     q("select id, kind, name, body from templates where workspace_id=$1 order by kind, name", [ws]),
     q("select id, url, events, last_status, last_at from webhooks where workspace_id=$1 order by created_at", [ws]),
     getTelegram(ws),
@@ -105,7 +105,7 @@ export default async function SettingsPage() {
             {keys.length === 0 && <tr><td colSpan={5} className="muted">Ключей нет</td></tr>}
             {keys.map((k: any) => (
               <tr key={k.id} className={k.revoked_at ? "muted" : ""}>
-                <td>{k.name}</td>
+                <td>{k.name}{k.scope === "all" && <span className="chip" style={{ marginLeft: 8 }}>все бренды</span>}</td>
                 <td><code>{k.prefix}…</code></td>
                 <td className="small">{fmt(k.created_at)}</td>
                 <td className="small">{fmt(k.last_used_at)}</td>

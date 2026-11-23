@@ -99,8 +99,8 @@ export async function uploadMediaAction(_: FormState, fd: FormData): Promise<For
 
 export async function deleteMediaAction(fd: FormData) {
   await q(
-    "delete from media m where id=$1 and not exists (select 1 from post_targets t where m.id = any(t.media_ids))",
-    [String(fd.get("media_id"))]
+    "delete from media m where id=$1 and workspace_id=$2 and not exists (select 1 from post_targets t where m.id = any(t.media_ids))",
+    [String(fd.get("media_id")), await defaultWorkspaceId()]
   );
   revalidatePath("/media");
 }
@@ -125,8 +125,8 @@ export async function addAccountAction(_: FormState, fd: FormData): Promise<Form
 export async function toggleAccountAction(fd: FormData) {
   await q(
     `update social_accounts set status = case when status='disabled' then 'active' else 'disabled' end, updated_at=now()
-      where id=$1`,
-    [String(fd.get("account_id"))]
+      where id=$1 and workspace_id=$2`,
+    [String(fd.get("account_id")), await defaultWorkspaceId()]
   );
   revalidatePath("/accounts");
 }
@@ -162,11 +162,13 @@ export async function saveWorkspaceAction(_: FormState, fd: FormData): Promise<F
 export async function createApiKeyAction(_: FormState, fd: FormData): Promise<FormState> {
   const name = String(fd.get("name") ?? "").trim() || "генератор";
   const k = newApiKey();
-  await q("insert into api_keys (workspace_id, name, prefix, key_hash) values ($1,$2,$3,$4)", [
+  const scope = fd.get("scope") === "all" ? "all" : "brand";
+  await q("insert into api_keys (workspace_id, name, prefix, key_hash, scope) values ($1,$2,$3,$4,$5)", [
     await defaultWorkspaceId(),
     name,
     k.prefix,
     k.hash,
+    scope,
   ]);
   revalidatePath("/settings");
   return { ok: `Ключ «${name}» создан. Скопируйте его сейчас — больше он не покажется.`, secret: k.secret };
@@ -193,7 +195,7 @@ export async function saveTemplateAction(_: FormState, fd: FormData): Promise<Fo
 }
 
 export async function deleteTemplateAction(fd: FormData) {
-  await q("delete from templates where id=$1", [String(fd.get("template_id"))]);
+  await q("delete from templates where id=$1 and workspace_id=$2", [String(fd.get("template_id")), await defaultWorkspaceId()]);
   revalidatePath("/settings");
 }
 
@@ -235,7 +237,7 @@ export async function createWebhookAction(_: FormState, fd: FormData): Promise<F
 }
 
 export async function deleteWebhookAction(fd: FormData) {
-  await q("delete from webhooks where id=$1", [String(fd.get("webhook_id"))]);
+  await q("delete from webhooks where id=$1 and workspace_id=$2", [String(fd.get("webhook_id")), await defaultWorkspaceId()]);
   revalidatePath("/settings");
 }
 

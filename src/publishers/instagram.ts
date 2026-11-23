@@ -5,6 +5,7 @@ import {
   type ErrorClass,
   type Issue,
   type MediaItem,
+  type CommentItem,
   type MediaListItem,
   type PostMetrics,
   type PublishContext,
@@ -299,6 +300,54 @@ export const instagram: Publisher = {
       like_count: m.like_count ?? null,
       comments_count: m.comments_count ?? null,
     }));
+  },
+
+  async listRecentComments(externalId, token, { maxMedia, sinceDays }) {
+    const out: CommentItem[] = [];
+    const media = await api<{ data: { id: string; permalink?: string; comments_count?: number; timestamp?: string }[] }>(
+      token, "GET", `${externalId}/media`, { fields: "id,permalink,comments_count,timestamp", limit: "30" }
+    );
+    const since = Date.now() - sinceDays * 86400e3;
+    const targets = (media.data ?? [])
+      .filter((m) => (m.comments_count ?? 0) > 0 && (!m.timestamp || new Date(m.timestamp).getTime() >= since))
+      .slice(0, maxMedia);
+    for (const m of targets) {
+      const r = await api<{ data: any[] }>(token, "GET", `${m.id}/comments`, {
+        fields: "id,text,username,timestamp,hidden,replies{id,text,username}",
+        limit: "50",
+      });
+      for (const c of r.data ?? []) {
+        out.push({
+          external_id: c.id,
+          media_id: m.id,
+          media_permalink: m.permalink ?? null,
+          parent_id: null,
+          username: c.username ?? null,
+          from_id: null,
+          text: c.text ?? "",
+          timestamp: c.timestamp ?? null,
+          hidden: Boolean(c.hidden),
+          replies: (c.replies?.data ?? []).map((x: any) => ({ id: x.id, username: x.username ?? null, text: x.text ?? "" })),
+        });
+      }
+    }
+    return out;
+  },
+
+  async replyToComment(commentId, text, token) {
+    const r = await api<{ id: string }>(token, "POST", `${commentId}/replies`, { message: text });
+    return { id: r.id };
+  },
+
+  async hideComment(commentId, hide, token) {
+    await api(token, "POST", commentId, { hide: hide ? "true" : "false" });
+  },
+
+  async privateReply(externalId, commentId, text, token) {
+    await api(token, "POST", `${externalId}/messages`, {
+      recipient: JSON.stringify({ comment_id: commentId }),
+      message: JSON.stringify({ text }),
+    });
   },
 
   /** Демография подписчиков. Instagram отдаёт её только от 100 подписчиков. */

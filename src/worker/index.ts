@@ -6,6 +6,7 @@ import { getBoss, enqueueTarget, PUBLISH_QUEUE, type PublishJob } from "@/lib/qu
 import { refreshPostStatus } from "@/lib/posts";
 import { emit } from "@/lib/notify";
 import { collectMetrics } from "@/lib/metrics";
+import { syncComments } from "@/lib/comments";
 import { publisherFor, PlatformError, type MediaItem, type PublishContext } from "@/publishers";
 
 const POLL_INTERVAL_S = 10;
@@ -162,9 +163,33 @@ const runMetrics = async () => {
 setTimeout(runMetrics, 60_000);
 const metricsTimer = setInterval(runMetrics, METRICS_INTERVAL_MIN * 60_000);
 
+// Комментарии: страховочный опрос на случай пропущенных вебхуков (по умолчанию каждые 15 минут).
+const COMMENTS_INTERVAL_MIN = Number(process.env.COMMENTS_INTERVAL_MIN) || 15;
+let commentsRunning = false;
+const runComments = async () => {
+  if (commentsRunning) return;
+  commentsRunning = true;
+  try {
+    const accs = await q<{ id: string; username: string | null }>("select id, username from social_accounts where platform='instagram' and status='active'");
+    for (const a of accs) {
+      try {
+        const r = await syncComments(a.id);
+        if (r.added || r.marked) console.log(`💬 @${a.username}: новых комментариев ${r.added}, уже отвеченных ${r.marked}`);
+      } catch (e) {
+        console.error(`💬 опрос комментариев @${a.username}:`, (e as Error).message);
+      }
+    }
+  } finally {
+    commentsRunning = false;
+  }
+};
+setTimeout(runComments, 90_000);
+const commentsTimer = setInterval(runComments, COMMENTS_INTERVAL_MIN * 60_000);
+
 const shutdown = async () => {
   console.log("останавливаюсь…");
   clearInterval(metricsTimer);
+  clearInterval(commentsTimer);
   await boss.stop({ graceful: true, timeout: 30_000 });
   await pool.end();
   process.exit(0);

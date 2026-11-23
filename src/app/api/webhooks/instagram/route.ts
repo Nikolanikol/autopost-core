@@ -4,6 +4,7 @@
 // События складываются в ig_events «как есть» — из них потом строятся раздел комментариев и плашка упоминаний.
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { ingestWebhookComment } from "@/lib/comments";
 import { q } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +53,14 @@ export async function POST(req: Request) {
         it.field,
         JSON.stringify(it.payload),
       ]);
+      // Комментарий → в раздел «Комментарии» (+ правила автоответа). Ошибка тут не должна ронять приём события.
+      if (it.field === "comments" && igId) {
+        try {
+          await ingestWebhookComment(igId, it.payload);
+        } catch (e) {
+          console.error("[webhook] comment ingest failed:", (e as Error).message);
+        }
+      }
     }
   }
   // Meta ждёт быстрый 200, иначе повторяет доставку.

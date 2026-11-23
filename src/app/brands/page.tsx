@@ -1,0 +1,94 @@
+import { defaultWorkspaceId, q } from "@/lib/db";
+import { createBrandAction, deleteBrandAction, moveAccountAction, renameBrandAction, switchBrandAction } from "./actions";
+
+export const dynamic = "force-dynamic";
+
+export default async function BrandsPage() {
+  const current = await defaultWorkspaceId();
+  const brands = await q<any>(
+    `select w.id, w.name, w.timezone,
+            (select count(*) from posts p where p.workspace_id = w.id) as posts,
+            (select count(*) from media m where m.workspace_id = w.id) as media,
+            (select count(*) from api_keys k where k.workspace_id = w.id and k.revoked_at is null) as keys
+       from workspaces w order by w.created_at`
+  );
+  const accounts = await q<any>(
+    `select a.id, a.workspace_id, a.platform, a.username, a.status,
+            exists (select 1 from post_targets t where t.account_id = a.id) as has_posts
+       from social_accounts a order by a.platform, a.username`
+  );
+
+  return (
+    <>
+      <h1>Бренды</h1>
+      <p className="muted small">
+        Бренд — это отдельное пространство: свои аккаунты, очередь и календарь, медиатека, шаблоны, правила комментариев,
+        аналитика и API-ключи. Переключайтесь в шапке; всё, что вы видите на других страницах, относится к выбранному бренду.
+      </p>
+
+      {brands.map((b: any) => {
+        const mine = accounts.filter((a: any) => a.workspace_id === b.id);
+        const empty = mine.length === 0 && Number(b.posts) === 0 && Number(b.media) === 0;
+        return (
+          <div key={b.id} className="card" style={b.id === current ? { borderColor: "var(--accent)" } : undefined}>
+            <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+              <form action={renameBrandAction} className="row" style={{ gap: 8, flex: 1, minWidth: 220 }}>
+                <input type="hidden" name="id" value={b.id} />
+                <input type="text" name="name" defaultValue={b.name} aria-label="Название бренда" style={{ maxWidth: 260, fontWeight: 600 }} />
+                <button className="ghost small" style={{ padding: "4px 10px" }}>Переименовать</button>
+              </form>
+              <div className="row" style={{ gap: 8 }}>
+                {b.id === current ? (
+                  <span className="chip">выбран сейчас</span>
+                ) : (
+                  <form action={switchBrandAction}>
+                    <input type="hidden" name="brand" value={b.id} />
+                    <button style={{ padding: "4px 12px" }}>Открыть</button>
+                  </form>
+                )}
+                {empty && brands.length > 1 && (
+                  <form action={deleteBrandAction}>
+                    <input type="hidden" name="id" value={b.id} />
+                    <button className="danger" style={{ padding: "4px 12px" }}>Удалить</button>
+                  </form>
+                )}
+              </div>
+            </div>
+            <div className="muted small" style={{ margin: "6px 0 10px" }}>
+              Часовой пояс: {b.timezone} · постов: {b.posts} · файлов: {b.media} · API-ключей: {b.keys}
+            </div>
+
+            {mine.length === 0 && <div className="muted small">Аккаунтов нет. Подключите на странице «Аккаунты» при выбранном бренде.</div>}
+            {mine.map((a: any) => (
+              <div key={a.id} className="row" style={{ justifyContent: "space-between", gap: 8, padding: "6px 0", borderTop: "1px solid var(--line)" }}>
+                <div>
+                  {a.platform === "instagram" ? "Instagram" : a.platform} · <b>@{a.username}</b>
+                  <span className={`chip s-${a.status}`} style={{ marginLeft: 8 }}>{a.status === "active" ? "активен" : a.status}</span>
+                </div>
+                {brands.length > 1 &&
+                  (a.has_posts ? (
+                    <span className="muted small" title="У аккаунта есть публикации — они принадлежат бренду">перенос недоступен: есть посты</span>
+                  ) : (
+                    <form action={moveAccountAction} className="row" style={{ gap: 6 }}>
+                      <input type="hidden" name="account_id" value={a.id} />
+                      <select name="brand" defaultValue={b.id} style={{ width: "auto" }} aria-label="Перенести в бренд">
+                        {brands.map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                      </select>
+                      <button className="ghost small" style={{ padding: "4px 10px" }}>Перенести</button>
+                    </form>
+                  ))}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+
+      <h2>Новый бренд</h2>
+      <form action={createBrandAction} className="card row" style={{ gap: 10 }}>
+        <input type="text" name="name" placeholder="Название, например Axis" required style={{ maxWidth: 320 }} />
+        <button>Создать и открыть</button>
+        <span className="muted small">Часовой пояс возьмётся от текущего бренда, его можно поменять в «Настройках».</span>
+      </form>
+    </>
+  );
+}

@@ -16,6 +16,7 @@
     "ig:check": "node --env-file=.env ig-test.mjs check"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "next": "^15.5.29",
     "pg": "^8.23.1",
     "pg-boss": "^10.4.2",

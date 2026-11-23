@@ -55,6 +55,26 @@ export interface Publisher {
   onlineFollowers?(externalId: string, token: string): Promise<OnlineDay[]>;
   /** Чужие публикации, где отмечен наш аккаунт. */
   listTags?(externalId: string, token: string): Promise<TaggedMedia[]>;
+  /** Комментарии под свежими публикациями (опрос на случай пропущенных вебхуков). */
+  listRecentComments?(externalId: string, token: string, opts: { maxMedia: number; sinceDays: number }): Promise<CommentItem[]>;
+  replyToComment?(commentId: string, text: string, token: string): Promise<{ id: string }>;
+  hideComment?(commentId: string, hide: boolean, token: string): Promise<void>;
+  /** Личное сообщение автору комментария (одно, в течение 7 дней после комментария). */
+  privateReply?(externalId: string, commentId: string, text: string, token: string): Promise<void>;
+}
+
+export interface CommentItem {
+  external_id: string;
+  media_id: string;
+  media_permalink: string | null;
+  parent_id: string | null;
+  username: string | null;
+  from_id: string | null;
+  text: string;
+  timestamp: string | null;
+  hidden: boolean;
+  /** Ответы под комментарием (нужны, чтобы понять, отвечали ли мы уже). */
+  replies: { id: string; username: string | null; text: string }[];
 }
 
 export interface OnlineDay {
