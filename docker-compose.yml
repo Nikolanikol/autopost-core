@@ -12,6 +12,9 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       GRAPH_VERSION: ${GRAPH_VERSION:-v24.0}
+      # Вебхук Instagram (/api/webhooks/instagram): проверка адреса и подписи событий Meta
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      IG_WEBHOOK_VERIFY_TOKEN: ${IG_WEBHOOK_VERIFY_TOKEN:-}
     volumes:
       - storage:/data/storage
     depends_on:
