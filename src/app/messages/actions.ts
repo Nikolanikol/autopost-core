@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { defaultWorkspaceId, one } from "@/lib/db";
 import { ignoreConversation, replyToConversation, syncMessages } from "@/lib/messages";
 
@@ -35,10 +36,14 @@ export async function syncMessagesAction(fd: FormData) {
   const accountId = String(fd.get("account_id") ?? "");
   const ws = await defaultWorkspaceId();
   if (!(await one("select 1 from social_accounts where id=$1 and workspace_id=$2", [accountId, ws]))) return;
+  // Итог опроса показываем на странице (?sync=…), чтобы ошибка токена или прав была видна, а не терялась в логах.
+  let note: string;
   try {
-    await syncMessages(accountId);
+    const r = await syncMessages(accountId);
+    note = `ok:${r.conversations}:${r.added}`;
   } catch (e) {
     console.error("[messages] sync failed:", (e as Error).message);
+    note = `err:${(e as Error).message.slice(0, 300)}`;
   }
-  done();
+  redirect(`/messages?${new URLSearchParams({ account: accountId, sync: note })}`);
 }

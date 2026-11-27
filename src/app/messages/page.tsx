@@ -27,7 +27,7 @@ const TABS: Record<string, { label: string; sql: string }> = {
   all: { label: "Все", sql: "status <> 'ignored'" },
 };
 
-export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ account?: string; t?: string; p?: string }> }) {
+export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ account?: string; t?: string; p?: string; sync?: string }> }) {
   const sp = await searchParams;
   const ws = await defaultWorkspaceId();
   const tz = await workspaceTz(ws);
@@ -76,6 +76,13 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
           <Button className="ghost small" style={{ padding: "4px 12px" }} title="Подтянуть сообщения, которые не дошли вебхуком">Обновить</Button>
         </form>
       </div>
+
+      {sp.sync?.startsWith("ok:") && (
+        <div className="card small muted" style={{ marginTop: 12 }}>
+          Опрос выполнен: диалогов в Instagram {sp.sync.split(":")[1]}, новых сообщений {sp.sync.split(":")[2]}.
+        </div>
+      )}
+      {sp.sync?.startsWith("err:") && <div className="card err" style={{ marginTop: 12 }}>Ошибка опроса: {sp.sync.slice(4)}</div>}
 
       <div className="row" style={{ margin: "12px 0", gap: 8 }}>
         {accounts.map((a) => (

@@ -229,7 +229,7 @@ const runMessages = async () => {
     for (const a of accs) {
       try {
         const r = await syncMessages(a.id);
-        if (r.added) console.log(`✉️ @${a.username}: новых сообщений ${r.added} в ${r.conversations} диалогах`);
+        console.log(`✉️ @${a.username}: диалогов ${r.conversations}, новых сообщений ${r.added}`);
       } catch (e) {
         console.error(`✉️ опрос сообщений @${a.username}:`, (e as Error).message);
       }
