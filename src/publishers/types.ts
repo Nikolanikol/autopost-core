@@ -67,6 +67,28 @@ export interface Publisher {
   privateReply?(externalId: string, commentId: string, text: string, token: string): Promise<void>;
   /** Комментарий от имени аккаунта под опубликованной публикацией (первый комментарий). */
   commentOnMedia?(mediaId: string, text: string, token: string): Promise<{ id: string }>;
+  /** Личные сообщения: свежие диалоги с последними сообщениями (опрос на случай пропущенных вебхуков). */
+  listConversations?(externalId: string, token: string, opts: { limit: number; messagesPerConversation: number }): Promise<ConversationItem[]>;
+  /** Ответить человеку в личные сообщения (окно — 24 часа после его последнего сообщения). */
+  sendMessage?(externalId: string, recipientId: string, text: string, token: string): Promise<{ id: string }>;
+  /** Имя профиля по IGSID (для вебхука, где приходит только id). */
+  profileUsername?(userId: string, token: string): Promise<string | null>;
+}
+
+export interface MessageItem {
+  external_id: string;
+  from_id: string | null;
+  from_username: string | null;
+  text: string;
+  attachments: { type: string; url: string | null }[];
+  timestamp: string | null;
+}
+
+export interface ConversationItem {
+  external_id: string;
+  updated_time: string | null;
+  participants: { id: string; username: string | null }[];
+  messages: MessageItem[];
 }
 
 export interface CommentItem {

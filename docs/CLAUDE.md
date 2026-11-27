@@ -22,7 +22,7 @@ claude mcp add --transport http --scope user autopost https://post.dkmatrix.com/
 ```
 
 `--scope user` делает сервер доступным во всех проектах этого компьютера. Проверка: `claude mcp list` должен
-показать `autopost` со статусом подключения, а в сессии `/mcp` — список из 27 инструментов.
+показать `autopost` со статусом подключения, а в сессии `/mcp` — список из 32 инструментов.
 
 Отзыв доступа: Настройки → API-ключи → «Отозвать» (на компьютере ничего менять не нужно).
 
@@ -35,6 +35,7 @@ claude mcp add --transport http --scope user autopost https://post.dkmatrix.com/
 | Очередь и посты | `list_queue`, `get_post`, `create_post` (в т.ч. `dry_run`), `reschedule_post`, `cancel_post`, `retry_post` |
 | Аналитика | `analytics_summary`, `analytics_top_posts`, `analytics_audience`, `analytics_online_hours`, `analytics_refresh` |
 | Комментарии | `list_comments`, `reply_comment`, `hide_comment`, `ignore_comment`, `sync_comments` |
+| Личные сообщения | `list_conversations`, `get_conversation`, `reply_message`, `ignore_conversation`, `sync_messages` (ответить можно в течение 24 часов после сообщения человека) |
 | Правила автоответа | `list_comment_rules`, `create_comment_rule`, `update_comment_rule`, `delete_comment_rule` |
 
 Почти везде есть параметр `brand` (название или часть названия, например `axis`) и `account` (`@ник`). Если брендов
@@ -58,6 +59,7 @@ claude mcp add --transport http --scope user autopost https://post.dkmatrix.com/
 - «Поставь это видео в ближайший слот Decay Matrix, подпись такая-то» → `create_post` (сначала `dry_run`, потом после вашего «да» — сам пост)
 - «Какие рилсы Axis зашли лучше всего за месяц и когда лучше публиковать?» → `analytics_top_posts`, `analytics_online_hours`
 - «Покажи новые комментарии Axis, предложи ответы» → `list_comments`; после одобрения → `reply_comment`
+- «Что написали в личку?» → `list_conversations` → `get_conversation`; после одобрения текста → `reply_message`
 - «Перенеси пост X на завтра 12:00» → `reschedule_post`
 
 ## 5. Безопасность

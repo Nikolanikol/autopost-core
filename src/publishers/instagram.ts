@@ -366,6 +366,47 @@ export const instagram: Publisher = {
     await api(token, "POST", commentId, { hide: hide ? "true" : "false" });
   },
 
+  async listConversations(externalId, token, { limit, messagesPerConversation }) {
+    const r = await api<{ data: any[] }>(token, "GET", `${externalId}/conversations`, {
+      platform: "instagram",
+      fields: `id,updated_time,participants,messages.limit(${messagesPerConversation}){id,created_time,from,message,attachments,is_unsupported}`,
+      limit: String(limit),
+    });
+    return (r.data ?? []).map((c) => ({
+      external_id: String(c.id),
+      updated_time: c.updated_time ?? null,
+      participants: (c.participants?.data ?? []).map((p: any) => ({ id: String(p.id), username: p.username ?? null })),
+      messages: (c.messages?.data ?? []).map((m: any) => ({
+        external_id: String(m.id),
+        from_id: m.from?.id ? String(m.from.id) : null,
+        from_username: m.from?.username ?? null,
+        text: String(m.message ?? ""),
+        attachments: [
+          ...(m.attachments?.data ?? []).map((x: any) => ({
+            type: x.image_data ? "image" : x.video_data ? "video" : x.file_url ? "file" : "attachment",
+            url: x.image_data?.url ?? x.video_data?.url ?? x.file_url ?? null,
+          })),
+          // Репосты, голосовые, стикеры и т. п.: Instagram сообщает, что сообщение было, но содержимое не отдаёт.
+          ...(m.is_unsupported && !m.message && !m.attachments?.data?.length ? [{ type: "unsupported", url: null }] : []),
+        ],
+        timestamp: m.created_time ?? null,
+      })),
+    }));
+  },
+
+  async sendMessage(externalId, recipientId, text, token) {
+    const r = await api<{ message_id: string }>(token, "POST", `${externalId}/messages`, {
+      recipient: JSON.stringify({ id: recipientId }),
+      message: JSON.stringify({ text }),
+    });
+    return { id: String(r.message_id) };
+  },
+
+  async profileUsername(userId, token) {
+    const r = await api<{ username?: string }>(token, "GET", userId, { fields: "username" });
+    return r.username ?? null;
+  },
+
   async privateReply(externalId, commentId, text, token) {
     await api(token, "POST", `${externalId}/messages`, {
       recipient: JSON.stringify({ comment_id: commentId }),

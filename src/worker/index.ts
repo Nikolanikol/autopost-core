@@ -8,6 +8,7 @@ import { emit, notifyDraft } from "@/lib/notify";
 import { tiktokAccessToken } from "@/lib/tiktokAuth";
 import { collectMetrics } from "@/lib/metrics";
 import { syncComments } from "@/lib/comments";
+import { syncMessages } from "@/lib/messages";
 import { publisherFor, PlatformError, type MediaItem, type PublishContext } from "@/publishers";
 
 const POLL_INTERVAL_S = 10;
@@ -217,10 +218,34 @@ const runComments = async () => {
 setTimeout(runComments, 90_000);
 const commentsTimer = setInterval(runComments, COMMENTS_INTERVAL_MIN * 60_000);
 
+// Личные сообщения: тот же страховочный опрос (по умолчанию каждые 15 минут).
+const MESSAGES_INTERVAL_MIN = Number(process.env.MESSAGES_INTERVAL_MIN) || 15;
+let messagesRunning = false;
+const runMessages = async () => {
+  if (messagesRunning) return;
+  messagesRunning = true;
+  try {
+    const accs = await q<{ id: string; username: string | null }>("select id, username from social_accounts where platform='instagram' and status='active'");
+    for (const a of accs) {
+      try {
+        const r = await syncMessages(a.id);
+        if (r.added) console.log(`✉️ @${a.username}: новых сообщений ${r.added} в ${r.conversations} диалогах`);
+      } catch (e) {
+        console.error(`✉️ опрос сообщений @${a.username}:`, (e as Error).message);
+      }
+    }
+  } finally {
+    messagesRunning = false;
+  }
+};
+setTimeout(runMessages, 120_000);
+const messagesTimer = setInterval(runMessages, MESSAGES_INTERVAL_MIN * 60_000);
+
 const shutdown = async () => {
   console.log("останавливаюсь…");
   clearInterval(metricsTimer);
   clearInterval(commentsTimer);
+  clearInterval(messagesTimer);
   await boss.stop({ graceful: true, timeout: 30_000 });
   await pool.end();
   process.exit(0);

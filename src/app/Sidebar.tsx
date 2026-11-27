@@ -5,6 +5,7 @@ import {
   CalendarIcon,
   ChatBubbleIcon,
   Cross1Icon,
+  EnvelopeClosedIcon,
   ExitIcon,
   GearIcon,
   HamburgerMenuIcon,
@@ -34,6 +35,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/analytics", label: "Аналитика", icon: <BarChartIcon /> },
       { href: "/comments", label: "Комментарии", icon: <ChatBubbleIcon /> },
+      { href: "/messages", label: "Сообщения", icon: <EnvelopeClosedIcon /> },
     ],
   },
   {

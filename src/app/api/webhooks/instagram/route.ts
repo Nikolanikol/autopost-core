@@ -5,6 +5,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ingestWebhookComment } from "@/lib/comments";
+import { ingestWebhookMessage } from "@/lib/messages";
 import { q } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,14 @@ export async function POST(req: Request) {
           await ingestWebhookComment(igId, it.payload);
         } catch (e) {
           console.error("[webhook] comment ingest failed:", (e as Error).message);
+        }
+      }
+      // Личное сообщение → в раздел «Сообщения».
+      if (it.field === "messages" && igId) {
+        try {
+          await ingestWebhookMessage(igId, it.payload);
+        } catch (e) {
+          console.error("[webhook] message ingest failed:", (e as Error).message);
         }
       }
     }

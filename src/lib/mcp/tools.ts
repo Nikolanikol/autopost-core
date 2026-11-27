@@ -8,6 +8,7 @@ import { syncAccountAnalytics } from "@/lib/analytics";
 import { accountSummary, audience, dailySeries, onlineHours, topMedia } from "@/lib/analyticsQueries";
 import { ignoreComment, perform, syncComments } from "@/lib/comments";
 import { one, q } from "@/lib/db";
+import { ignoreConversation, replyToConversation, replyWindow, syncMessages } from "@/lib/messages";
 import { probeUrl, registerMediaUrl } from "@/lib/media";
 import { cancelPost, createPost, getPost, reschedulePost, retryTarget, ValidationError } from "@/lib/posts";
 import { listSlots, nextFreeSlot, WEEKDAYS } from "@/lib/slots";
@@ -74,7 +75,7 @@ const fail = (message: string, details?: unknown) => ({
 const INSTRUCTIONS = `Сервис автопостинга и аналитики Instagram с несколькими брендами (у каждого свои аккаунты, очередь, комментарии).
 Правила работы:
 1. Начни с overview — он покажет бренды, аккаунты, очередь и новые комментарии. Параметр brand нужен почти везде; не угадывай бренд — если не уверен, спроси пользователя.
-2. Публикации и ответы видны публично. Перед create_post и reply_comment покажи пользователю итоговый текст и время и дождись согласия, если он не сказал «публикуй сам». Для нового сценария сначала вызови create_post с dry_run=true.
+2. Публикации и ответы видны публично. Перед create_post, reply_comment и reply_message покажи пользователю итоговый текст и время и дождись согласия, если он не сказал «публикуй сам». Личные сообщения: сначала get_conversation (прочитай всю переписку), и учти reply_window — после 24 часов ответить нельзя. Для нового сценария сначала вызови create_post с dry_run=true.
 3. Время: schedule принимает 'next_slot' (ближайший свободный слот аккаунта — предпочтительно), 'now' или ISO-время со смещением (например 2026-12-01T10:00:00+03:00). Часовой пояс бренда указан в ответах; показывай пользователю локальное время.
 4. Перед планированием посмотри list_queue, чтобы не ставить два поста на одно время и видеть порядок публикаций.
 5. Аналитика берётся из базы (обновляется раз в 3 часа); analytics_refresh запрашивай только если нужны свежие цифры.
@@ -139,7 +140,8 @@ export function buildServer(ctx: ApiKeyContext) {
       const brand = await pickBrand(ctx, b);
       const accounts = await q<any>(
         `select a.id, a.username, a.platform, a.status,
-                (select count(*) from ig_comments c where c.account_id=a.id and c.status in ('new','failed') and c.parent_id is null)::int as new_comments
+                (select count(*) from ig_comments c where c.account_id=a.id and c.status in ('new','failed') and c.parent_id is null)::int as new_comments,
+                (select count(*) from ig_conversations v where v.account_id=a.id and v.status='new')::int as new_messages
            from social_accounts a where a.workspace_id=$1 order by a.username`,
         [brand.id]
       );
@@ -551,6 +553,105 @@ export function buildServer(ctx: ApiKeyContext) {
     const brand = await pickBrand(ctx, b);
     const acc = await pickAccount(brand, account);
     return { account: "@" + acc.username, ...(await syncComments(acc.id)) };
+  });
+
+  /* ── Личные сообщения ── */
+
+  async function ownConversation(brand: Brand, id: string) {
+    const c = await one<any>(
+      "select c.*, a.username as account_username from ig_conversations c join social_accounts a on a.id=c.account_id where c.id=$1 and a.workspace_id=$2",
+      [id, brand.id]
+    );
+    if (!c) throw new ToolError("Диалог не найден в этом бренде (нужен id из list_conversations)");
+    return c;
+  }
+
+  tool(
+    "list_conversations",
+    "Личные сообщения аккаунта (диалоги). status: new — человек написал последним, ждёт ответа; done — мы ответили; all. В ответе id диалога, ник, последнее сообщение и reply_window: пока open=true, можно ответить; после 24 часов от его сообщения Instagram ответ не примет.",
+    {
+      brand: brandArg,
+      account: accountArg,
+      status: z.enum(["new", "done", "all"]).default("new"),
+      limit: z.number().int().min(1).max(50).default(20),
+    },
+    { readOnly: true },
+    async ({ brand: b, account, status, limit }) => {
+      const brand = await pickBrand(ctx, b);
+      const acc = await pickAccount(brand, account);
+      const st = status === "new" ? "status='new'" : status === "done" ? "status='replied'" : "status<>'ignored'";
+      const rows = await q<any>(
+        `select id, participant_username, last_text, status, last_message_at, last_incoming_at, last_error
+           from ig_conversations where account_id=$1 and ${st} order by last_message_at desc nulls last limit $2`,
+        [acc.id, limit]
+      );
+      return {
+        account: "@" + acc.username,
+        count: rows.length,
+        conversations: rows.map((r) => ({
+          id: r.id,
+          from: r.participant_username ? "@" + r.participant_username : "?",
+          status: r.status,
+          last_message: r.last_text,
+          last_message_at: when(r.last_message_at, brand.timezone),
+          reply_window: replyWindow(r.last_incoming_at),
+          last_error: r.last_error,
+        })),
+      };
+    }
+  );
+
+  tool(
+    "get_conversation",
+    "Вся переписка с одним человеком (последние сообщения по времени). Прочитай её перед ответом: вопрос может быть в предыдущих сообщениях.",
+    { brand: brandArg, conversation_id: z.string().uuid().describe("id из list_conversations"), limit: z.number().int().min(1).max(100).default(30) },
+    { readOnly: true },
+    async ({ brand: b, conversation_id, limit }) => {
+      const brand = await pickBrand(ctx, b);
+      const c = await ownConversation(brand, conversation_id);
+      const msgs = await q<any>(
+        "select direction, text, attachments, sent_at from (select * from ig_messages where conversation_id=$1 order by sent_at desc limit $2) m order by sent_at",
+        [conversation_id, limit]
+      );
+      return {
+        account: "@" + c.account_username,
+        from: c.participant_username ? "@" + c.participant_username : "?",
+        status: c.status,
+        reply_window: replyWindow(c.last_incoming_at),
+        messages: msgs.map((m) => ({
+          who: m.direction === "in" ? "человек" : "мы",
+          text: m.text,
+          attachments: m.attachments?.length ? m.attachments : undefined,
+          at: when(m.sent_at, brand.timezone),
+        })),
+      };
+    }
+  );
+
+  tool(
+    "reply_message",
+    "Ответить человеку в личные сообщения (уходит сразу, необратимо). Работает только в течение 24 часов после его последнего сообщения (см. reply_window). Покажи пользователю текст до отправки.",
+    { brand: brandArg, conversation_id: z.string().uuid().describe("id из list_conversations"), text: z.string().min(1).max(1000) },
+    { external: true, destructive: true },
+    async ({ brand: b, conversation_id, text }) => {
+      const brand = await pickBrand(ctx, b);
+      const c = await ownConversation(brand, conversation_id);
+      const r = await replyToConversation(conversation_id, text);
+      return { ok: r.ok, error: r.error, to: c.participant_username ? "@" + c.participant_username : c.participant_id };
+    }
+  );
+
+  tool("ignore_conversation", "Пометить диалог как не требующий ответа (в Instagram ничего не отправляется). Новое сообщение от человека вернёт его в «новые».", { brand: brandArg, conversation_id: z.string().uuid() }, { idempotent: true }, async ({ brand: b, conversation_id }) => {
+    const brand = await pickBrand(ctx, b);
+    await ownConversation(brand, conversation_id);
+    await ignoreConversation(conversation_id);
+    return { ok: true };
+  });
+
+  tool("sync_messages", "Подтянуть из Instagram личные сообщения, которые не дошли вебхуком (обычно не нужно: опрос идёт раз в 15 минут).", { brand: brandArg, account: accountArg }, { external: true, idempotent: true }, async ({ brand: b, account }) => {
+    const brand = await pickBrand(ctx, b);
+    const acc = await pickAccount(brand, account);
+    return { account: "@" + acc.username, ...(await syncMessages(acc.id)) };
   });
 
   tool("list_comment_rules", "Правила автоответа бренда: ключевые слова → ответ / личное сообщение / скрытие.", { brand: brandArg }, { readOnly: true }, async ({ brand: b }) => {

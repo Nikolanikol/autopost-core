@@ -38,7 +38,7 @@ db/migrations/        SQL-схема
 
 ## API v1
 
-> Для управления через Claude есть MCP-сервер `/api/mcp` (27 инструментов, все бренды одним ключом) — см. [docs/CLAUDE.md](docs/CLAUDE.md).
+> Для управления через Claude есть MCP-сервер `/api/mcp` (32 инструмента, все бренды одним ключом) — см. [docs/CLAUDE.md](docs/CLAUDE.md).
 
 Ключ создаётся в интерфейсе: **Настройки → API-ключи**. Заголовок: `Authorization: Bearer ak_…`.
 
